@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/config"
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/domain"
@@ -184,6 +185,7 @@ func (h *Handler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	payload.Name = strings.TrimSpace(payload.Name)
 	if err := h.validate.Struct(payload); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error: h.formatValidationError(err),
@@ -256,6 +258,8 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if payload.Name != nil {
+		trimmedName := strings.TrimSpace(*payload.Name)
+		payload.Name = &trimmedName
 		if err := h.validate.Struct(payload); err != nil {
 			writeJSON(w, http.StatusBadRequest, ErrorResponse{
 				Error: h.formatValidationError(err),
