@@ -15,4 +15,5 @@
 - Add structured logging, health endpoints, and tracing once the basic workflow works.
 
 ## Future development plan
+- Introduce versioned DB migration and remove repo.Migrate() / GORM AutoMigrate()
 - payments, search, image storage, authentication, notifications, and a gateway
