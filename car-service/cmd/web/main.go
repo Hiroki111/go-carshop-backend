@@ -23,7 +23,7 @@ import (
 
 const (
 	portNumber                 = ":8080"
-	initialProductListCacheTTL = 30 * time.Minute
+	initialCarListCacheTTL = 30 * time.Minute
 )
 
 // @title           Go Backend Example API
@@ -61,7 +61,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	productsCache := cache.NewRedisProductsCache(
+	carsCache := cache.NewRedisCarsCache(
 		redisClient,
 	)
 
@@ -70,10 +70,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	productsCacheWarmer := cache.NewRedisProductsCacheWarmer(*repo, productsCache)
-	productsCacheWarmer.WarmProductList(initialProductListCacheTTL)
+	carsCacheWarmer := cache.NewRedisCarsCacheWarmer(*repo, carsCache)
+	carsCacheWarmer.WarmCarList(initialCarListCacheTTL)
 
-	service := service.NewService(repo, productsCache, productsCacheWarmer)
+	service := service.NewService(repo, carsCache, carsCacheWarmer)
 	h := handler.NewHandler(service)
 
 	server := &http.Server{

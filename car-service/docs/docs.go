@@ -26,7 +26,7 @@ const docTemplate = `{
     "paths": {
         "/cars": {
             "get": {
-                "description": "Returns a paginated list of products with optional filtering and sorting.",
+                "description": "Returns a paginated list of cars with optional filtering and sorting.",
                 "consumes": [
                     "application/json"
                 ],
@@ -34,9 +34,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "products"
+                    "cars"
                 ],
-                "summary": "List products",
+                "summary": "List cars",
                 "parameters": [
                     {
                         "type": "string",
@@ -52,7 +52,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "filter by product name (partial match)",
+                        "description": "filter by car name (partial match)",
                         "name": "name",
                         "in": "query"
                     },
@@ -85,7 +85,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.GetProductsResponse"
+                            "$ref": "#/definitions/handler.GetCarsResponse"
                         }
                     },
                     "400": {
@@ -108,7 +108,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new product (Admin only).",
+                "description": "Creates a new car (Admin only).",
                 "consumes": [
                     "application/json"
                 ],
@@ -116,17 +116,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "products"
+                    "cars"
                 ],
-                "summary": "Create a product",
+                "summary": "Create a car",
                 "parameters": [
                     {
-                        "description": "Product payload",
-                        "name": "product",
+                        "description": "Car payload",
+                        "name": "car",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.CreateProductRequest"
+                            "$ref": "#/definitions/handler.CreateCarRequest"
                         }
                     }
                 ],
@@ -134,7 +134,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handler.CreateProductResponse"
+                            "$ref": "#/definitions/handler.CreateCarResponse"
                         }
                     },
                     "400": {
@@ -166,7 +166,7 @@ const docTemplate = `{
         },
         "/cars/{id}": {
             "get": {
-                "description": "Returns a single product.",
+                "description": "Returns a single car.",
                 "consumes": [
                     "application/json"
                 ],
@@ -174,13 +174,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "products"
+                    "cars"
                 ],
-                "summary": "Get a product by ID",
+                "summary": "Get a car by ID",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Product ID",
+                        "description": "Car ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -190,7 +190,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.GetProductResponse"
+                            "$ref": "#/definitions/handler.GetCarResponse"
                         }
                     },
                     "400": {
@@ -219,7 +219,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates product fields (Admin only).",
+                "description": "Updates car fields (Admin only).",
                 "consumes": [
                     "application/json"
                 ],
@@ -227,24 +227,24 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "products"
+                    "cars"
                 ],
-                "summary": "Update a product",
+                "summary": "Update a car",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Product ID",
+                        "description": "Car ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Product update payload",
-                        "name": "product",
+                        "description": "Car update payload",
+                        "name": "car",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.UpdateProductRequest"
+                            "$ref": "#/definitions/handler.UpdateCarRequest"
                         }
                     }
                 ],
@@ -252,7 +252,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.UpdateProductResponse"
+                            "$ref": "#/definitions/handler.UpdateCarResponse"
                         }
                     },
                     "400": {
@@ -290,72 +290,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handler.CreateProductRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 2,
-                    "example": "Product Name"
-                },
-                "price_cents": {
-                    "type": "integer",
-                    "example": 12000
-                }
-            }
-        },
-        "handler.CreateProductResponse": {
-            "type": "object",
-            "properties": {
-                "item": {
-                    "$ref": "#/definitions/handler.ProductItem"
-                }
-            }
-        },
-        "handler.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                }
-            }
-        },
-        "handler.GetProductResponse": {
-            "type": "object",
-            "properties": {
-                "item": {
-                    "$ref": "#/definitions/handler.ProductItem"
-                }
-            }
-        },
-        "handler.GetProductsResponse": {
-            "type": "object",
-            "properties": {
-                "hasNext": {
-                    "type": "boolean"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.ProductItem"
-                    }
-                },
-                "limit": {
-                    "type": "integer"
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handler.ProductItem": {
+        "handler.CarItem": {
             "type": "object",
             "properties": {
                 "id": {
@@ -369,14 +304,17 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.UpdateProductRequest": {
+        "handler.CreateCarRequest": {
             "type": "object",
+            "required": [
+                "name"
+            ],
             "properties": {
                 "name": {
                     "type": "string",
                     "maxLength": 100,
                     "minLength": 2,
-                    "example": "Product Name"
+                    "example": "Car Name"
                 },
                 "price_cents": {
                     "type": "integer",
@@ -384,11 +322,73 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.UpdateProductResponse": {
+        "handler.CreateCarResponse": {
             "type": "object",
             "properties": {
                 "item": {
-                    "$ref": "#/definitions/handler.ProductItem"
+                    "$ref": "#/definitions/handler.CarItem"
+                }
+            }
+        },
+        "handler.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.GetCarResponse": {
+            "type": "object",
+            "properties": {
+                "item": {
+                    "$ref": "#/definitions/handler.CarItem"
+                }
+            }
+        },
+        "handler.GetCarsResponse": {
+            "type": "object",
+            "properties": {
+                "hasNext": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.CarItem"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.UpdateCarRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "Car Name"
+                },
+                "price_cents": {
+                    "type": "integer",
+                    "example": 12000
+                }
+            }
+        },
+        "handler.UpdateCarResponse": {
+            "type": "object",
+            "properties": {
+                "item": {
+                    "$ref": "#/definitions/handler.CarItem"
                 }
             }
         }

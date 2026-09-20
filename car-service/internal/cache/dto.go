@@ -2,7 +2,7 @@ package cache
 
 import "github.com/Hiroki111/go-carshop-backend/car-service/internal/domain"
 
-type ProductsPage struct {
-	Products []domain.Product
+type CarsPage struct {
+	Cars []domain.Car
 	Total    int64
 }

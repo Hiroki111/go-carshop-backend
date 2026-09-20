@@ -14,8 +14,8 @@ import (
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/handler"
 )
 
-func TestGetProducts_WithSorting(t *testing.T) {
-	products := []domain.Product{
+func TestGetCars_WithSorting(t *testing.T) {
+	cars := []domain.Car{
 		{Name: "apple", PriceCents: 100},
 		{Name: "banana", PriceCents: 300},
 		{Name: "cherry", PriceCents: 200},
@@ -23,17 +23,17 @@ func TestGetProducts_WithSorting(t *testing.T) {
 
 	tests := []struct {
 		orderBy, sortIn             string
-		expectedProductNamesInOrder []string
+		expectedCarNamesInOrder []string
 	}{
-		{orderBy: "name", sortIn: "asc", expectedProductNamesInOrder: []string{"apple", "banana", "cherry"}},
-		{orderBy: "name", sortIn: "desc", expectedProductNamesInOrder: []string{"cherry", "banana", "apple"}},
-		{orderBy: "name", sortIn: "", expectedProductNamesInOrder: []string{"apple", "banana", "cherry"}},
-		{orderBy: "price_cents", sortIn: "asc", expectedProductNamesInOrder: []string{"apple", "cherry", "banana"}},
-		{orderBy: "price_cents", sortIn: "desc", expectedProductNamesInOrder: []string{"banana", "cherry", "apple"}},
-		{orderBy: "price_cents", sortIn: "", expectedProductNamesInOrder: []string{"apple", "cherry", "banana"}},
-		{orderBy: "created_at", sortIn: "asc", expectedProductNamesInOrder: []string{"apple", "banana", "cherry"}},
-		{orderBy: "created_at", sortIn: "desc", expectedProductNamesInOrder: []string{"cherry", "banana", "apple"}},
-		{orderBy: "created_at", sortIn: "", expectedProductNamesInOrder: []string{"apple", "banana", "cherry"}},
+		{orderBy: "name", sortIn: "asc", expectedCarNamesInOrder: []string{"apple", "banana", "cherry"}},
+		{orderBy: "name", sortIn: "desc", expectedCarNamesInOrder: []string{"cherry", "banana", "apple"}},
+		{orderBy: "name", sortIn: "", expectedCarNamesInOrder: []string{"apple", "banana", "cherry"}},
+		{orderBy: "price_cents", sortIn: "asc", expectedCarNamesInOrder: []string{"apple", "cherry", "banana"}},
+		{orderBy: "price_cents", sortIn: "desc", expectedCarNamesInOrder: []string{"banana", "cherry", "apple"}},
+		{orderBy: "price_cents", sortIn: "", expectedCarNamesInOrder: []string{"apple", "cherry", "banana"}},
+		{orderBy: "created_at", sortIn: "asc", expectedCarNamesInOrder: []string{"apple", "banana", "cherry"}},
+		{orderBy: "created_at", sortIn: "desc", expectedCarNamesInOrder: []string{"cherry", "banana", "apple"}},
+		{orderBy: "created_at", sortIn: "", expectedCarNamesInOrder: []string{"apple", "banana", "cherry"}},
 	}
 
 	for _, test := range tests {
@@ -46,7 +46,7 @@ func TestGetProducts_WithSorting(t *testing.T) {
 
 		t.Run(testName, func(t *testing.T) {
 			app, db := setupTestApp(t)
-			seedProducts(t, db, products)
+			seedCars(t, db, cars)
 
 			rec := executeRequest(t, app, http.MethodGet, path, nil)
 
@@ -54,7 +54,7 @@ func TestGetProducts_WithSorting(t *testing.T) {
 				t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 			}
 
-			var resp handler.GetProductsResponse
+			var resp handler.GetCarsResponse
 			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 				t.Fatalf("invalid json response")
 			}
@@ -64,15 +64,15 @@ func TestGetProducts_WithSorting(t *testing.T) {
 				actualNames = append(actualNames, item.Name)
 			}
 
-			if !reflect.DeepEqual(test.expectedProductNamesInOrder, actualNames) {
-				t.Fatalf("expected %v, got %v", test.expectedProductNamesInOrder, actualNames)
+			if !reflect.DeepEqual(test.expectedCarNamesInOrder, actualNames) {
+				t.Fatalf("expected %v, got %v", test.expectedCarNamesInOrder, actualNames)
 			}
 		})
 	}
 }
 
-func TestGetProducts_WithFilteringByName(t *testing.T) {
-	products := []domain.Product{
+func TestGetCars_WithFilteringByName(t *testing.T) {
+	cars := []domain.Car{
 		{Name: "apple"},
 		{Name: "banana"},
 		{Name: "cherry"},
@@ -81,13 +81,13 @@ func TestGetProducts_WithFilteringByName(t *testing.T) {
 	tests := []struct {
 		name                 string
 		keyword              string
-		expectedProductNames []string
+		expectedCarNames []string
 	}{
-		{name: "Matching one word", keyword: "ap", expectedProductNames: []string{"apple"}},
-		{name: "Matching one word - case insensitive", keyword: "Ap", expectedProductNames: []string{"apple"}},
-		{name: "Matching multiple words", keyword: "a", expectedProductNames: []string{"apple", "banana"}},
-		{name: "Matching nothing", keyword: "aa", expectedProductNames: []string{}},
-		{name: "Empty keyword", keyword: "", expectedProductNames: []string{"apple", "banana", "cherry"}},
+		{name: "Matching one word", keyword: "ap", expectedCarNames: []string{"apple"}},
+		{name: "Matching one word - case insensitive", keyword: "Ap", expectedCarNames: []string{"apple"}},
+		{name: "Matching multiple words", keyword: "a", expectedCarNames: []string{"apple", "banana"}},
+		{name: "Matching nothing", keyword: "aa", expectedCarNames: []string{}},
+		{name: "Empty keyword", keyword: "", expectedCarNames: []string{"apple", "banana", "cherry"}},
 	}
 
 	for _, test := range tests {
@@ -95,7 +95,7 @@ func TestGetProducts_WithFilteringByName(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			app, db := setupTestApp(t)
-			seedProducts(t, db, products)
+			seedCars(t, db, cars)
 
 			rec := executeRequest(t, app, http.MethodGet, path, nil)
 
@@ -103,13 +103,13 @@ func TestGetProducts_WithFilteringByName(t *testing.T) {
 				t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
 			}
 
-			var resp handler.GetProductsResponse
+			var resp handler.GetCarsResponse
 			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 				t.Fatalf("invalid json response")
 			}
 
-			if len(test.expectedProductNames) != len(resp.Items) {
-				t.Fatalf("expected %d items, got %d", len(test.expectedProductNames), len(resp.Items))
+			if len(test.expectedCarNames) != len(resp.Items) {
+				t.Fatalf("expected %d items, got %d", len(test.expectedCarNames), len(resp.Items))
 			}
 
 			actualNames := make([]string, 0, len(resp.Items))
@@ -117,34 +117,34 @@ func TestGetProducts_WithFilteringByName(t *testing.T) {
 				actualNames = append(actualNames, item.Name)
 			}
 			sort.Strings(actualNames)
-			sort.Strings(test.expectedProductNames)
+			sort.Strings(test.expectedCarNames)
 
-			if !reflect.DeepEqual(actualNames, test.expectedProductNames) {
-				t.Fatalf("expected products %v, got %v", test.expectedProductNames, actualNames)
+			if !reflect.DeepEqual(actualNames, test.expectedCarNames) {
+				t.Fatalf("expected cars %v, got %v", test.expectedCarNames, actualNames)
 			}
 		})
 	}
 }
 
-func TestGetProducts_WithFilteringByPrice(t *testing.T) {
-	products := []domain.Product{
-		{Name: "$1.00 Product", PriceCents: 100},
-		{Name: "$1.50 Product", PriceCents: 150},
-		{Name: "$2.00 Product", PriceCents: 200},
+func TestGetCars_WithFilteringByPrice(t *testing.T) {
+	cars := []domain.Car{
+		{Name: "$1.00 Car", PriceCents: 100},
+		{Name: "$1.50 Car", PriceCents: 150},
+		{Name: "$2.00 Car", PriceCents: 200},
 	}
 
 	tests := []struct {
 		name                 string
 		minPrice, maxPrice   string
-		expectedProductNames []string
+		expectedCarNames []string
 		expectedCode         int
 	}{
-		{name: "Matching items", minPrice: "100", maxPrice: "160", expectedProductNames: []string{"$1.00 Product", "$1.50 Product"}, expectedCode: http.StatusOK},
-		{name: "Matching items without minPrice", minPrice: "", maxPrice: "150", expectedProductNames: []string{"$1.00 Product", "$1.50 Product"}, expectedCode: http.StatusOK},
-		{name: "Matching items without maxPrice", minPrice: "150", maxPrice: "", expectedProductNames: []string{"$1.50 Product", "$2.00 Product"}, expectedCode: http.StatusOK},
-		{name: "Matching items without minPrice and maxPrice", minPrice: "", maxPrice: "", expectedProductNames: []string{"$1.00 Product", "$1.50 Product", "$2.00 Product"}, expectedCode: http.StatusOK},
-		{name: "Matching no item when minPrice is larger than maxPrice", minPrice: "200", maxPrice: "100", expectedProductNames: []string{}, expectedCode: http.StatusOK},
-		{name: "Bad request with invalid price", minPrice: "abc", maxPrice: "200", expectedProductNames: []string{}, expectedCode: http.StatusBadRequest},
+		{name: "Matching items", minPrice: "100", maxPrice: "160", expectedCarNames: []string{"$1.00 Car", "$1.50 Car"}, expectedCode: http.StatusOK},
+		{name: "Matching items without minPrice", minPrice: "", maxPrice: "150", expectedCarNames: []string{"$1.00 Car", "$1.50 Car"}, expectedCode: http.StatusOK},
+		{name: "Matching items without maxPrice", minPrice: "150", maxPrice: "", expectedCarNames: []string{"$1.50 Car", "$2.00 Car"}, expectedCode: http.StatusOK},
+		{name: "Matching items without minPrice and maxPrice", minPrice: "", maxPrice: "", expectedCarNames: []string{"$1.00 Car", "$1.50 Car", "$2.00 Car"}, expectedCode: http.StatusOK},
+		{name: "Matching no item when minPrice is larger than maxPrice", minPrice: "200", maxPrice: "100", expectedCarNames: []string{}, expectedCode: http.StatusOK},
+		{name: "Bad request with invalid price", minPrice: "abc", maxPrice: "200", expectedCarNames: []string{}, expectedCode: http.StatusBadRequest},
 	}
 
 	for _, test := range tests {
@@ -152,7 +152,7 @@ func TestGetProducts_WithFilteringByPrice(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			app, db := setupTestApp(t)
-			seedProducts(t, db, products)
+			seedCars(t, db, cars)
 
 			rec := executeRequest(t, app, http.MethodGet, path, nil)
 
@@ -161,13 +161,13 @@ func TestGetProducts_WithFilteringByPrice(t *testing.T) {
 			}
 
 			if test.expectedCode == http.StatusOK {
-				var resp handler.GetProductsResponse
+				var resp handler.GetCarsResponse
 				if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 					t.Fatalf("invalid json response")
 				}
 
-				if len(test.expectedProductNames) != len(resp.Items) {
-					t.Fatalf("expected %d items, got %d", len(test.expectedProductNames), len(resp.Items))
+				if len(test.expectedCarNames) != len(resp.Items) {
+					t.Fatalf("expected %d items, got %d", len(test.expectedCarNames), len(resp.Items))
 				}
 
 				actualNames := make([]string, 0, len(resp.Items))
@@ -175,20 +175,20 @@ func TestGetProducts_WithFilteringByPrice(t *testing.T) {
 					actualNames = append(actualNames, item.Name)
 				}
 				sort.Strings(actualNames)
-				sort.Strings(test.expectedProductNames)
+				sort.Strings(test.expectedCarNames)
 
-				if !reflect.DeepEqual(actualNames, test.expectedProductNames) {
-					t.Fatalf("expected products %v, got %v", test.expectedProductNames, actualNames)
+				if !reflect.DeepEqual(actualNames, test.expectedCarNames) {
+					t.Fatalf("expected cars %v, got %v", test.expectedCarNames, actualNames)
 				}
 			}
 		})
 	}
 }
 
-func TestGetProducts_WithPagination(t *testing.T) {
-	products := make([]domain.Product, 100)
-	for i := range products {
-		products[i] = domain.Product{Name: strconv.Itoa(i)}
+func TestGetCars_WithPagination(t *testing.T) {
+	cars := make([]domain.Car, 100)
+	for i := range cars {
+		cars[i] = domain.Car{Name: strconv.Itoa(i)}
 	}
 
 	tests := []struct {
@@ -250,7 +250,7 @@ func TestGetProducts_WithPagination(t *testing.T) {
 		path := fmt.Sprintf("/cars?page=%s&limit=%s", test.page, test.limit)
 		t.Run(test.name, func(t *testing.T) {
 			app, db := setupTestApp(t)
-			seedProducts(t, db, products)
+			seedCars(t, db, cars)
 
 			rec := executeRequest(t, app, http.MethodGet, path, nil)
 
@@ -259,7 +259,7 @@ func TestGetProducts_WithPagination(t *testing.T) {
 			}
 
 			if test.expectedCode == http.StatusOK {
-				var resp handler.GetProductsResponse
+				var resp handler.GetCarsResponse
 				if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 					t.Fatalf("invalid json response")
 				}
@@ -286,29 +286,29 @@ func TestGetProducts_WithPagination(t *testing.T) {
 	}
 }
 
-func TestGetProduct_ById(t *testing.T) {
+func TestGetCar_ById(t *testing.T) {
 	tests := []struct {
 		name         string
-		getId        func(t *testing.T, products []domain.Product) string
+		getId        func(t *testing.T, cars []domain.Car) string
 		expectedCode int
 	}{
 		{
-			name: "Product found",
-			getId: func(t *testing.T, products []domain.Product) string {
-				return fmt.Sprint(products[0].ID)
+			name: "Car found",
+			getId: func(t *testing.T, cars []domain.Car) string {
+				return fmt.Sprint(cars[0].ID)
 			},
 			expectedCode: http.StatusOK,
 		},
 		{
-			name: "Product not found",
-			getId: func(t *testing.T, products []domain.Product) string {
-				return fmt.Sprint(products[0].ID + 1)
+			name: "Car not found",
+			getId: func(t *testing.T, cars []domain.Car) string {
+				return fmt.Sprint(cars[0].ID + 1)
 			},
 			expectedCode: http.StatusNotFound,
 		},
 		{
 			name: "Non-numeric ID",
-			getId: func(t *testing.T, products []domain.Product) string {
+			getId: func(t *testing.T, cars []domain.Car) string {
 				return "abc"
 			},
 			expectedCode: http.StatusBadRequest,
@@ -319,8 +319,8 @@ func TestGetProduct_ById(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			app, db := setupTestApp(t)
 
-			products := seedProducts(t, db, []domain.Product{{Name: "test"}})
-			id := test.getId(t, products)
+			cars := seedCars(t, db, []domain.Car{{Name: "test"}})
+			id := test.getId(t, cars)
 			path := fmt.Sprintf("/cars/%s", id)
 
 			rec := executeRequest(t, app, http.MethodGet, path, nil)
@@ -330,7 +330,7 @@ func TestGetProduct_ById(t *testing.T) {
 			}
 
 			if test.expectedCode == http.StatusOK {
-				var resp handler.GetProductResponse
+				var resp handler.GetCarResponse
 				if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 					t.Fatalf("invalid json response")
 				}
@@ -348,7 +348,7 @@ func TestGetProduct_ById(t *testing.T) {
 	}
 }
 
-func TestCreateProduct(t *testing.T) {
+func TestCreateCar(t *testing.T) {
 	type Palyload struct {
 		Name       string `json:"name"`
 		PriceCents int64  `json:"price_cents"`
@@ -358,27 +358,27 @@ func TestCreateProduct(t *testing.T) {
 		testName            string
 		palyload            Palyload
 		expectedCode        int
-		expectedProductName string
+		expectedCarName string
 	}{
 		{
-			testName:            "Product created",
+			testName:            "Car created",
 			palyload:            Palyload{Name: "test", PriceCents: 1},
 			expectedCode:        http.StatusCreated,
-			expectedProductName: "test",
+			expectedCarName: "test",
 		},
 		{
-			testName:            "Product created with trimmed name",
+			testName:            "Car created with trimmed name",
 			palyload:            Palyload{Name: "   test   ", PriceCents: 1},
 			expectedCode:        http.StatusCreated,
-			expectedProductName: "test",
+			expectedCarName: "test",
 		},
 		{
-			testName:     "Failed to create product - blank name",
+			testName:     "Failed to create car - blank name",
 			palyload:     Palyload{Name: "   ", PriceCents: 1},
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			testName:     "Failed to create product - negative price",
+			testName:     "Failed to create car - negative price",
 			palyload:     Palyload{Name: "test", PriceCents: -1},
 			expectedCode: http.StatusBadRequest,
 		},
@@ -400,64 +400,64 @@ func TestCreateProduct(t *testing.T) {
 			}
 
 			if rec.Code == http.StatusCreated {
-				var resp handler.CreateProductResponse
+				var resp handler.CreateCarResponse
 				if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
 				}
 
-				if resp.Item.Name != test.expectedProductName {
-					t.Fatalf("expected name in response %s, got %s", test.expectedProductName, resp.Item.Name)
+				if resp.Item.Name != test.expectedCarName {
+					t.Fatalf("expected name in response %s, got %s", test.expectedCarName, resp.Item.Name)
 				}
 
-				var createdProduct domain.Product
-				if err := db.First(&createdProduct, resp.Item.ID).Error; err != nil {
-					t.Fatalf("product with ID %d not found in DB", resp.Item.ID)
+				var createdCar domain.Car
+				if err := db.First(&createdCar, resp.Item.ID).Error; err != nil {
+					t.Fatalf("car with ID %d not found in DB", resp.Item.ID)
 				}
 
-				if createdProduct.Name != test.expectedProductName {
-					t.Fatalf("expected name in DB %s, got %s", test.expectedProductName, createdProduct.Name)
+				if createdCar.Name != test.expectedCarName {
+					t.Fatalf("expected name in DB %s, got %s", test.expectedCarName, createdCar.Name)
 				}
 			}
 		})
 	}
 }
 
-func TestUpdateProduct(t *testing.T) {
+func TestUpdateCar(t *testing.T) {
 	type Payload struct {
 		Name       *string `json:"name"`
 		PriceCents *int64  `json:"price_cents"`
 	}
-	const currentProductName = "current product name"
-	const updatedProductName = "this is the new name"
-	const unavailableProductName = "this name is taken"
+	const currentCarName = "current car name"
+	const updatedCarName = "this is the new name"
+	const unavailableCarName = "this name is taken"
 
 	tests := []struct {
 		testName            string
 		payload             Payload
 		hasValidId          bool
 		expectedCode        int
-		expectedProductName string
+		expectedCarName string
 	}{
 		{
 			testName:            "success - full update",
-			payload:             Payload{Name: strPtr(updatedProductName), PriceCents: int64Ptr(10)},
+			payload:             Payload{Name: strPtr(updatedCarName), PriceCents: int64Ptr(10)},
 			hasValidId:          true,
 			expectedCode:        http.StatusOK,
-			expectedProductName: updatedProductName,
+			expectedCarName: updatedCarName,
 		},
 		{
 			testName:            "success - update name only",
-			payload:             Payload{Name: strPtr(updatedProductName)},
+			payload:             Payload{Name: strPtr(updatedCarName)},
 			hasValidId:          true,
 			expectedCode:        http.StatusOK,
-			expectedProductName: updatedProductName,
+			expectedCarName: updatedCarName,
 		},
 		{
 			testName:            "success - name is trimmed",
-			payload:             Payload{Name: strPtr(" " + updatedProductName + " ")},
+			payload:             Payload{Name: strPtr(" " + updatedCarName + " ")},
 			hasValidId:          true,
 			expectedCode:        http.StatusOK,
-			expectedProductName: updatedProductName,
+			expectedCarName: updatedCarName,
 		},
 		{
 			testName:     "success - update price_cents only",
@@ -474,13 +474,13 @@ func TestUpdateProduct(t *testing.T) {
 
 		{
 			testName:     "fail - invalid ID",
-			payload:      Payload{Name: strPtr(updatedProductName), PriceCents: int64Ptr(10)},
+			payload:      Payload{Name: strPtr(updatedCarName), PriceCents: int64Ptr(10)},
 			hasValidId:   false,
 			expectedCode: http.StatusNotFound,
 		},
 		{
 			testName:     "fail - duplicate name",
-			payload:      Payload{Name: strPtr(unavailableProductName), PriceCents: int64Ptr(10)},
+			payload:      Payload{Name: strPtr(unavailableCarName), PriceCents: int64Ptr(10)},
 			hasValidId:   true,
 			expectedCode: http.StatusConflict,
 		},
@@ -492,7 +492,7 @@ func TestUpdateProduct(t *testing.T) {
 		},
 		{
 			testName:     "fail - negative price_cents",
-			payload:      Payload{Name: strPtr(updatedProductName), PriceCents: int64Ptr(-10)},
+			payload:      Payload{Name: strPtr(updatedCarName), PriceCents: int64Ptr(-10)},
 			hasValidId:   true,
 			expectedCode: http.StatusBadRequest,
 		},
@@ -502,16 +502,16 @@ func TestUpdateProduct(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			app, db := setupTestApp(t)
 
-			currentProduct := domain.Product{Name: currentProductName, PriceCents: 5}
-			anotherProduct := domain.Product{Name: unavailableProductName, PriceCents: 5}
-			db.Create(&currentProduct)
-			db.Create(&anotherProduct)
+			currentCar := domain.Car{Name: currentCarName, PriceCents: 5}
+			anotherCar := domain.Car{Name: unavailableCarName, PriceCents: 5}
+			db.Create(&currentCar)
+			db.Create(&anotherCar)
 
 			var path string
 			if test.hasValidId {
-				path = fmt.Sprintf("/cars/%d", currentProduct.ID)
+				path = fmt.Sprintf("/cars/%d", currentCar.ID)
 			} else {
-				path = fmt.Sprintf("/cars/%d", currentProduct.ID+anotherProduct.ID)
+				path = fmt.Sprintf("/cars/%d", currentCar.ID+anotherCar.ID)
 			}
 
 			rec := executeRequest(t, app, http.MethodPatch, path, test.payload)
@@ -521,24 +521,24 @@ func TestUpdateProduct(t *testing.T) {
 			}
 
 			if rec.Code == http.StatusOK {
-				var resp handler.UpdateProductResponse
+				var resp handler.UpdateCarResponse
 				if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
 				}
 
-				var updated domain.Product
-				db.First(&updated, currentProduct.ID)
+				var updated domain.Car
+				db.First(&updated, currentCar.ID)
 
 				if test.payload.Name != nil {
-					if updated.Name != test.expectedProductName {
-						t.Fatalf("expected name in DB %s, got %s", test.expectedProductName, updated.Name)
+					if updated.Name != test.expectedCarName {
+						t.Fatalf("expected name in DB %s, got %s", test.expectedCarName, updated.Name)
 					}
-					if resp.Item.Name != test.expectedProductName {
-						t.Fatalf("expected name in response %s, got %s", test.expectedProductName, resp.Item.Name)
+					if resp.Item.Name != test.expectedCarName {
+						t.Fatalf("expected name in response %s, got %s", test.expectedCarName, resp.Item.Name)
 					}
 				} else {
-					if updated.Name != currentProduct.Name {
-						t.Fatalf("expected name %s, got %s", currentProduct.Name, updated.Name)
+					if updated.Name != currentCar.Name {
+						t.Fatalf("expected name %s, got %s", currentCar.Name, updated.Name)
 					}
 				}
 
@@ -547,8 +547,8 @@ func TestUpdateProduct(t *testing.T) {
 						t.Fatalf("expected price_cents %d, got %v", *test.payload.PriceCents, updated.PriceCents)
 					}
 				} else {
-					if updated.PriceCents != currentProduct.PriceCents {
-						t.Fatalf("expected price_cents %d, got %v", currentProduct.PriceCents, updated.PriceCents)
+					if updated.PriceCents != currentCar.PriceCents {
+						t.Fatalf("expected price_cents %d, got %v", currentCar.PriceCents, updated.PriceCents)
 					}
 				}
 			}
@@ -556,7 +556,7 @@ func TestUpdateProduct(t *testing.T) {
 	}
 }
 
-func TestDeleteProduct(t *testing.T) {
+func TestDeleteCar(t *testing.T) {
 	tests := []struct {
 		testName     string
 		hasValidId   bool
@@ -578,14 +578,14 @@ func TestDeleteProduct(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			app, db := setupTestApp(t)
 
-			product := domain.Product{Name: "test", PriceCents: 5}
-			db.Create(&product)
+			car := domain.Car{Name: "test", PriceCents: 5}
+			db.Create(&car)
 
 			var path string
 			if test.hasValidId {
-				path = fmt.Sprintf("/cars/%d", product.ID)
+				path = fmt.Sprintf("/cars/%d", car.ID)
 			} else {
-				path = fmt.Sprintf("/cars/%d", product.ID+1)
+				path = fmt.Sprintf("/cars/%d", car.ID+1)
 			}
 
 			rec := executeRequest(t, app, http.MethodDelete, path, nil)
@@ -595,8 +595,8 @@ func TestDeleteProduct(t *testing.T) {
 			}
 
 			if test.expectedCode == http.StatusOK {
-				if err := db.First(&domain.Product{}, product.ID).Error; err == nil {
-					t.Fatalf("product ID %d was not deleted", product.ID)
+				if err := db.First(&domain.Car{}, car.ID).Error; err == nil {
+					t.Fatalf("car ID %d was not deleted", car.ID)
 				}
 			}
 		})

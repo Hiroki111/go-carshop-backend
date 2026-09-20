@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type GetProductsInput struct {
+type GetCarsInput struct {
 	OrderBy  string
 	SortIn   string
 	Name     string
@@ -20,7 +20,7 @@ type GetProductsInput struct {
 	Limit    int
 }
 
-type UpdateProductsInput struct {
+type UpdateCarsInput struct {
 	ID         uint
 	Name       *string
 	PriceCents *uint
@@ -31,11 +31,11 @@ type UpdateOrderInput struct {
 	PriceCents *uint
 }
 
-func (r *Repository) GetProductsWithTotalCount(inputs GetProductsInput) ([]domain.Product, int64, error) {
-	var result []domain.Product
+func (r *Repository) GetCarsWithTotalCount(inputs GetCarsInput) ([]domain.Car, int64, error) {
+	var result []domain.Car
 	var total int64
 
-	query := r.db.Model(&domain.Product{})
+	query := r.db.Model(&domain.Car{})
 	if inputs.Name != "" {
 		query = query.Where("LOWER(name) LIKE ?", "%"+strings.ToLower(inputs.Name)+"%")
 	}
@@ -70,45 +70,45 @@ func (r *Repository) GetProductsWithTotalCount(inputs GetProductsInput) ([]domai
 	return result, total, nil
 }
 
-func (r *Repository) GetProductById(id uint) (domain.Product, error) {
-	var product domain.Product
+func (r *Repository) GetCarById(id uint) (domain.Car, error) {
+	var car domain.Car
 
-	err := r.db.First(&product, id).Error
+	err := r.db.First(&car, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domain.Product{}, ErrItemNotFound
+			return domain.Car{}, ErrItemNotFound
 		}
-		return domain.Product{}, err
+		return domain.Car{}, err
 	}
 
-	return product, nil
+	return car, nil
 }
 
-func (r *Repository) CreateProduct(data domain.Product) (domain.Product, error) {
-	product := domain.Product{Name: data.Name, PriceCents: data.PriceCents}
-	result := r.db.Create(&product)
+func (r *Repository) CreateCar(data domain.Car) (domain.Car, error) {
+	car := domain.Car{Name: data.Name, PriceCents: data.PriceCents}
+	result := r.db.Create(&car)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
-			return domain.Product{}, ErrProductAlreadyExists
+			return domain.Car{}, ErrCarAlreadyExists
 		}
-		return domain.Product{}, result.Error
+		return domain.Car{}, result.Error
 	}
 
-	return product, nil
+	return car, nil
 }
 
-func (r *Repository) UpdateProduct(data UpdateProductsInput) (domain.Product, error) {
-	var product domain.Product
-	if err := r.db.First(&product, data.ID).Error; err != nil {
+func (r *Repository) UpdateCar(data UpdateCarsInput) (domain.Car, error) {
+	var car domain.Car
+	if err := r.db.First(&car, data.ID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domain.Product{}, ErrItemNotFound
+			return domain.Car{}, ErrItemNotFound
 		}
-		return domain.Product{}, err
+		return domain.Car{}, err
 	}
 
 	updates := map[string]interface{}{
-		"version": product.Version + 1,
+		"version": car.Version + 1,
 	}
 
 	if data.Name != nil {
@@ -119,26 +119,26 @@ func (r *Repository) UpdateProduct(data UpdateProductsInput) (domain.Product, er
 	}
 
 	result := r.db.
-		Model(&product).
-		Where("id = ? AND version = ?", product.ID, product.Version).
+		Model(&car).
+		Where("id = ? AND version = ?", car.ID, car.Version).
 		Updates(updates)
 
 	if err := result.Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return domain.Product{}, ErrProductAlreadyExists
+			return domain.Car{}, ErrCarAlreadyExists
 		}
-		return domain.Product{}, err
+		return domain.Car{}, err
 	}
 
 	if result.RowsAffected == 0 {
-		return domain.Product{}, ErrOptimisticLockFailed
+		return domain.Car{}, ErrOptimisticLockFailed
 	}
 
-	return product, nil
+	return car, nil
 }
 
-func (r *Repository) DeleteProduct(id uint) error {
-	result := r.db.Delete(&domain.Product{}, id)
+func (r *Repository) DeleteCar(id uint) error {
+	result := r.db.Delete(&domain.Car{}, id)
 
 	if result.Error != nil {
 		return result.Error
@@ -152,31 +152,31 @@ func (r *Repository) DeleteProduct(id uint) error {
 }
 
 // NOTE: Currently unused
-func (r *Repository) GetProductForUpdate(tx *gorm.DB, id uint) (domain.Product, error) {
-	var product domain.Product
+func (r *Repository) GetCarForUpdate(tx *gorm.DB, id uint) (domain.Car, error) {
+	var car domain.Car
 
-	err := r.withTx(tx).db.Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).First(&product, "id = ?", id).Error
+	err := r.withTx(tx).db.Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).First(&car, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domain.Product{}, ErrItemNotFound
+			return domain.Car{}, ErrItemNotFound
 		}
-		return domain.Product{}, err
+		return domain.Car{}, err
 	}
 
-	if !product.IsAvailable {
-		return domain.Product{}, ErrItemNotAvailable
+	if !car.IsAvailable {
+		return domain.Car{}, ErrItemNotAvailable
 	}
 
-	return product, nil
+	return car, nil
 }
 
 // NOTE: Currently unused
-func (r *Repository) UpdateProductAvailability(tx *gorm.DB, id uint, available bool) error {
-	return r.withTx(tx).db.Model(&domain.Product{}).Where("id = ?", id).Update("is_available", available).Error
+func (r *Repository) UpdateCarAvailability(tx *gorm.DB, id uint, available bool) error {
+	return r.withTx(tx).db.Model(&domain.Car{}).Where("id = ?", id).Update("is_available", available).Error
 }
 
-func GetDefaultQueryForProducts() GetProductsInput {
-	return GetProductsInput{
+func GetDefaultQueryForCars() GetCarsInput {
+	return GetCarsInput{
 		OrderBy:  "",
 		SortIn:   "",
 		Name:     "",

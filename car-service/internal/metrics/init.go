@@ -4,8 +4,8 @@ import "github.com/prometheus/client_golang/prometheus"
 
 func Register() {
 	prometheus.MustRegister(
-		ProductsCacheHits,
-		ProductsCacheMisses,
+		CarsCacheHits,
+		CarsCacheMisses,
 		RedisCacheReads,
 		RedisCacheWrites,
 		RedisCacheReadDuration,

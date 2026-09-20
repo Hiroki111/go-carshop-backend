@@ -4,41 +4,41 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-type ProductItem struct {
+type CarItem struct {
 	ID         uint   `json:"id"`
 	Name       string `json:"name"`
 	PriceCents uint   `json:"price_cents"`
 }
 
-type GetProductsResponse struct {
-	Items   []ProductItem `json:"items"`
+type GetCarsResponse struct {
+	Items   []CarItem `json:"items"`
 	Page    int           `json:"page"`
 	Limit   int           `json:"limit"`
 	Total   int           `json:"total"`
 	HasNext bool          `json:"hasNext"`
 }
 
-type GetProductResponse struct {
-	Item ProductItem `json:"item"`
+type GetCarResponse struct {
+	Item CarItem `json:"item"`
 }
 
-type CreateProductRequest struct {
-	Name       string `json:"name" validate:"required,min=2,max=100" example:"Product Name"`
+type CreateCarRequest struct {
+	Name       string `json:"name" validate:"required,min=2,max=100" example:"Car Name"`
 	PriceCents uint   `json:"price_cents" example:"12000"`
 }
 
-type CreateProductResponse struct {
-	Item ProductItem `json:"item"`
+type CreateCarResponse struct {
+	Item CarItem `json:"item"`
 }
 
-type UpdateProductRequest struct {
-	Name       *string `json:"name" validate:"min=2,max=100" example:"Product Name"`
+type UpdateCarRequest struct {
+	Name       *string `json:"name" validate:"min=2,max=100" example:"Car Name"`
 	PriceCents *uint   `json:"price_cents" example:"12000"`
 }
 
-type UpdateProductResponse struct {
-	Item ProductItem `json:"item"`
+type UpdateCarResponse struct {
+	Item CarItem `json:"item"`
 }
-type DeleteProductResponse struct {
+type DeleteCarResponse struct {
 	Message string `json:"message"`
 }

@@ -35,9 +35,9 @@ func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
 		t.Fatalf("migration failed: %v", err)
 	}
 
-	productsCache := cache.NewNoopProductsCache()
-	productsCacheWarmer := cache.NewNoopProductsCacheWarmer()
-	service := service.NewService(repo, productsCache, productsCacheWarmer)
+	carsCache := cache.NewNoopCarsCache()
+	carsCacheWarmer := cache.NewNoopCarsCacheWarmer()
+	service := service.NewService(repo, carsCache, carsCacheWarmer)
 
 	handler := handler.NewHandler(service)
 	return routes(handler), db
@@ -75,16 +75,16 @@ func int64Ptr(i int64) *int64 {
 	return &i
 }
 
-func seedProducts(t *testing.T, db *gorm.DB, products []domain.Product) []domain.Product {
+func seedCars(t *testing.T, db *gorm.DB, cars []domain.Car) []domain.Car {
 	t.Helper()
 
-	seededProducts := make([]domain.Product, len(products))
-	for i, product := range products {
-		if result := db.Create(&product); result.Error != nil {
+	seededCars := make([]domain.Car, len(cars))
+	for i, car := range cars {
+		if result := db.Create(&car); result.Error != nil {
 			t.Fatal(result.Error)
 		}
-		seededProducts[i] = product
+		seededCars[i] = car
 	}
 
-	return seededProducts
+	return seededCars
 }

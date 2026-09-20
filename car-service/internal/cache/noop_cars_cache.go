@@ -7,51 +7,51 @@ import (
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/domain"
 )
 
-type NoopProductsCache struct{}
+type NoopCarsCache struct{}
 
-func NewNoopProductsCache() *NoopProductsCache {
-	return &NoopProductsCache{}
+func NewNoopCarsCache() *NoopCarsCache {
+	return &NoopCarsCache{}
 }
 
-func (c *NoopProductsCache) GetProduct(
+func (c *NoopCarsCache) GetCar(
 	ctx context.Context,
 	key string,
-) (*domain.Product, bool, error) {
+) (*domain.Car, bool, error) {
 	return nil, false, nil
 }
 
-func (c *NoopProductsCache) GetPage(
+func (c *NoopCarsCache) GetPage(
 	ctx context.Context,
 	key string,
-) (*ProductsPage, bool, error) {
+) (*CarsPage, bool, error) {
 	return nil, false, nil
 }
 
-func (c *NoopProductsCache) SetProduct(
+func (c *NoopCarsCache) SetCar(
 	ctx context.Context,
 	key string,
-	product *domain.Product,
+	car *domain.Car,
 	ttl time.Duration,
 ) error {
 	return nil
 }
 
-func (c *NoopProductsCache) SetPage(
+func (c *NoopCarsCache) SetPage(
 	ctx context.Context,
 	key string,
-	page *ProductsPage,
+	page *CarsPage,
 	ttl time.Duration,
 ) error {
 	return nil
 }
 
-func (c *NoopProductsCache) InvalidateProducts(
+func (c *NoopCarsCache) InvalidateCars(
 	ctx context.Context,
 ) error {
 	return nil
 }
 
-func (c *NoopProductsCache) InvalidateProduct(
+func (c *NoopCarsCache) InvalidateCar(
 	ctx context.Context,
 	cacheKey string,
 ) error {

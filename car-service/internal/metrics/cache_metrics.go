@@ -3,17 +3,17 @@ package metrics
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
-	ProductsCacheHits = prometheus.NewCounter(
+	CarsCacheHits = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "app_cache_products_hits_total",
-			Help: "Total number of product cache hits",
+			Name: "app_cache_cars_hits_total",
+			Help: "Total number of car cache hits",
 		},
 	)
 
-	ProductsCacheMisses = prometheus.NewCounter(
+	CarsCacheMisses = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "app_cache_products_misses_total",
-			Help: "Total number of product cache misses",
+			Name: "app_cache_cars_misses_total",
+			Help: "Total number of car cache misses",
 		},
 	)
 )

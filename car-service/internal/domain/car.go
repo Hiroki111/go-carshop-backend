@@ -2,7 +2,7 @@ package domain
 
 import "gorm.io/gorm"
 
-type Product struct {
+type Car struct {
 	gorm.Model
 	Name        string `gorm:"uniqueIndex;not null"`
 	PriceCents  uint   `gorm:"not null"`

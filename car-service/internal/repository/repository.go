@@ -14,7 +14,7 @@ func NewRepository(db *gorm.DB) *Repository {
 }
 
 func (r *Repository) Migrate() error {
-	return r.db.AutoMigrate(&domain.Product{})
+	return r.db.AutoMigrate(&domain.Car{})
 }
 
 func (r *Repository) DB() *gorm.DB {

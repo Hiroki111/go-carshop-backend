@@ -1,9 +1,18 @@
 basePath: /
 definitions:
-  handler.CreateProductRequest:
+  handler.CarItem:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      price_cents:
+        type: integer
+    type: object
+  handler.CreateCarRequest:
     properties:
       name:
-        example: Product Name
+        example: Car Name
         maxLength: 100
         minLength: 2
         type: string
@@ -13,28 +22,28 @@ definitions:
     required:
     - name
     type: object
-  handler.CreateProductResponse:
+  handler.CreateCarResponse:
     properties:
       item:
-        $ref: '#/definitions/handler.ProductItem'
+        $ref: '#/definitions/handler.CarItem'
     type: object
   handler.ErrorResponse:
     properties:
       error:
         type: string
     type: object
-  handler.GetProductResponse:
+  handler.GetCarResponse:
     properties:
       item:
-        $ref: '#/definitions/handler.ProductItem'
+        $ref: '#/definitions/handler.CarItem'
     type: object
-  handler.GetProductsResponse:
+  handler.GetCarsResponse:
     properties:
       hasNext:
         type: boolean
       items:
         items:
-          $ref: '#/definitions/handler.ProductItem'
+          $ref: '#/definitions/handler.CarItem'
         type: array
       limit:
         type: integer
@@ -43,19 +52,10 @@ definitions:
       total:
         type: integer
     type: object
-  handler.ProductItem:
-    properties:
-      id:
-        type: integer
-      name:
-        type: string
-      price_cents:
-        type: integer
-    type: object
-  handler.UpdateProductRequest:
+  handler.UpdateCarRequest:
     properties:
       name:
-        example: Product Name
+        example: Car Name
         maxLength: 100
         minLength: 2
         type: string
@@ -63,10 +63,10 @@ definitions:
         example: 12000
         type: integer
     type: object
-  handler.UpdateProductResponse:
+  handler.UpdateCarResponse:
     properties:
       item:
-        $ref: '#/definitions/handler.ProductItem'
+        $ref: '#/definitions/handler.CarItem'
     type: object
 host: localhost:8080
 info:
@@ -86,8 +86,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Returns a paginated list of products with optional filtering and
-        sorting.
+      description: Returns a paginated list of cars with optional filtering and sorting.
       parameters:
       - description: field to sort by (name, price_cents)
         in: query
@@ -97,7 +96,7 @@ paths:
         in: query
         name: sortIn
         type: string
-      - description: filter by product name (partial match)
+      - description: filter by car name (partial match)
         in: query
         name: name
         type: string
@@ -123,7 +122,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.GetProductsResponse'
+            $ref: '#/definitions/handler.GetCarsResponse'
         "400":
           description: Bad Request
           schema:
@@ -132,27 +131,27 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
-      summary: List products
+      summary: List cars
       tags:
-      - products
+      - cars
     post:
       consumes:
       - application/json
-      description: Creates a new product (Admin only).
+      description: Creates a new car (Admin only).
       parameters:
-      - description: Product payload
+      - description: Car payload
         in: body
-        name: product
+        name: car
         required: true
         schema:
-          $ref: '#/definitions/handler.CreateProductRequest'
+          $ref: '#/definitions/handler.CreateCarRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handler.CreateProductResponse'
+            $ref: '#/definitions/handler.CreateCarResponse'
         "400":
           description: Bad Request
           schema:
@@ -171,16 +170,16 @@ paths:
             $ref: '#/definitions/handler.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create a product
+      summary: Create a car
       tags:
-      - products
+      - cars
   /cars/{id}:
     get:
       consumes:
       - application/json
-      description: Returns a single product.
+      description: Returns a single car.
       parameters:
-      - description: Product ID
+      - description: Car ID
         in: path
         name: id
         required: true
@@ -191,7 +190,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.GetProductResponse'
+            $ref: '#/definitions/handler.GetCarResponse'
         "400":
           description: Bad Request
           schema:
@@ -204,32 +203,32 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
-      summary: Get a product by ID
+      summary: Get a car by ID
       tags:
-      - products
+      - cars
     patch:
       consumes:
       - application/json
-      description: Updates product fields (Admin only).
+      description: Updates car fields (Admin only).
       parameters:
-      - description: Product ID
+      - description: Car ID
         in: path
         name: id
         required: true
         type: integer
-      - description: Product update payload
+      - description: Car update payload
         in: body
-        name: product
+        name: car
         required: true
         schema:
-          $ref: '#/definitions/handler.UpdateProductRequest'
+          $ref: '#/definitions/handler.UpdateCarRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.UpdateProductResponse'
+            $ref: '#/definitions/handler.UpdateCarResponse'
         "400":
           description: Bad Request
           schema:
@@ -252,9 +251,9 @@ paths:
             $ref: '#/definitions/handler.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update a product
+      summary: Update a car
       tags:
-      - products
+      - cars
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and then your token.

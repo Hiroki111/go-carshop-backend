@@ -40,5 +40,10 @@ cp .env.example .env # only needed if .env does not already exist
 go run ./cmd/web
 ```
 
+Populate `cars` table by running this:
+```bash
+docker exec -i <postgres-container-name> psql -U car_service_user -d car_service < migrations/seed.sql
+```
+
 The service uses PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.
 Stop the dependencies with `docker compose down`. Their data persists in Docker volumes; use `docker compose down -v` only when you intentionally want to delete local database and cache data.

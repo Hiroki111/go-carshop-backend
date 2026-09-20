@@ -7,18 +7,18 @@ import (
 
 type Service struct {
 	repo                *repository.Repository
-	productsCache       cache.ProductsCache
-	productsCacheWarmer cache.ProductsCacheWarmer
+	carsCache       cache.CarsCache
+	carsCacheWarmer cache.CarsCacheWarmer
 }
 
 func NewService(
 	repo *repository.Repository,
-	productsCache cache.ProductsCache,
-	productsCacheWarmer cache.ProductsCacheWarmer,
+	carsCache cache.CarsCache,
+	carsCacheWarmer cache.CarsCacheWarmer,
 ) *Service {
 	return &Service{
 		repo:                repo,
-		productsCache:       productsCache,
-		productsCacheWarmer: productsCacheWarmer,
+		carsCache:       carsCache,
+		carsCacheWarmer: carsCacheWarmer,
 	}
 }

@@ -18,11 +18,11 @@ func routes(handler *handler.Handler) http.Handler {
 	mux.Route("/", func(r chi.Router) {
 		r.Use(middleware.Recoverer)
 
-		r.Get("/cars", handler.GetProducts)
-		r.Get("/cars/{id}", handler.GetProductById)
-		r.Post("/cars", handler.CreateProduct)
-		r.Patch("/cars/{id}", handler.UpdateProduct)
-		r.Delete("/cars/{id}", handler.DeleteProduct)
+		r.Get("/cars", handler.GetCars)
+		r.Get("/cars/{id}", handler.GetCarById)
+		r.Post("/cars", handler.CreateCar)
+		r.Patch("/cars/{id}", handler.UpdateCar)
+		r.Delete("/cars/{id}", handler.DeleteCar)
 	})
 
 	// public

@@ -10,22 +10,22 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type RedisProductsCache struct {
+type RedisCarsCache struct {
 	client *redis.Client
 }
 
-func NewRedisProductsCache(
+func NewRedisCarsCache(
 	client *redis.Client,
-) *RedisProductsCache {
-	return &RedisProductsCache{
+) *RedisCarsCache {
+	return &RedisCarsCache{
 		client: client,
 	}
 }
 
-func (c *RedisProductsCache) GetProduct(
+func (c *RedisCarsCache) GetCar(
 	ctx context.Context,
 	key string,
-) (*domain.Product, bool, error) {
+) (*domain.Car, bool, error) {
 	val, err := c.client.Get(ctx, key).Result()
 
 	if err == redis.Nil {
@@ -36,25 +36,25 @@ func (c *RedisProductsCache) GetProduct(
 		return nil, false, err
 	}
 
-	var product domain.Product
-	if err := json.Unmarshal([]byte(val), &product); err != nil {
+	var car domain.Car
+	if err := json.Unmarshal([]byte(val), &car); err != nil {
 		return nil, false, err
 	}
 
-	return &product, true, nil
+	return &car, true, nil
 }
 
-func (c *RedisProductsCache) GetPage(
+func (c *RedisCarsCache) GetPage(
 	ctx context.Context,
 	key string,
-) (*ProductsPage, bool, error) {
+) (*CarsPage, bool, error) {
 	start := time.Now()
 	metrics.RedisCacheReads.Inc()
 	val, err := c.client.Get(ctx, key).Result()
 	metrics.RedisCacheReadDuration.Observe(time.Since(start).Seconds())
 
 	if err == redis.Nil {
-		metrics.ProductsCacheMisses.Inc()
+		metrics.CarsCacheMisses.Inc()
 		return nil, false, nil
 	}
 
@@ -62,23 +62,23 @@ func (c *RedisProductsCache) GetPage(
 		return nil, false, err
 	}
 
-	metrics.ProductsCacheHits.Inc()
+	metrics.CarsCacheHits.Inc()
 
-	var products ProductsPage
-	if err := json.Unmarshal([]byte(val), &products); err != nil {
+	var cars CarsPage
+	if err := json.Unmarshal([]byte(val), &cars); err != nil {
 		return nil, false, err
 	}
 
-	return &products, true, nil
+	return &cars, true, nil
 }
 
-func (c *RedisProductsCache) SetProduct(
+func (c *RedisCarsCache) SetCar(
 	ctx context.Context,
 	key string,
-	product *domain.Product,
+	car *domain.Car,
 	ttl time.Duration,
 ) error {
-	data, err := json.Marshal(product)
+	data, err := json.Marshal(car)
 	if err != nil {
 		return err
 	}
@@ -87,10 +87,10 @@ func (c *RedisProductsCache) SetProduct(
 	return err
 }
 
-func (c *RedisProductsCache) SetPage(
+func (c *RedisCarsCache) SetPage(
 	ctx context.Context,
 	key string,
-	page *ProductsPage,
+	page *CarsPage,
 	ttl time.Duration,
 ) error {
 	data, err := json.Marshal(page)
@@ -107,8 +107,8 @@ func (c *RedisProductsCache) SetPage(
 	return err
 }
 
-func (c *RedisProductsCache) InvalidateProducts(ctx context.Context) error {
-	iter := c.client.Scan(ctx, 0, "products:*", 0).Iterator()
+func (c *RedisCarsCache) InvalidateCars(ctx context.Context) error {
+	iter := c.client.Scan(ctx, 0, "cars:*", 0).Iterator()
 	for iter.Next(ctx) {
 		if err := c.client.Del(ctx, iter.Val()).Err(); err != nil {
 			return err
@@ -117,6 +117,6 @@ func (c *RedisProductsCache) InvalidateProducts(ctx context.Context) error {
 	return iter.Err()
 }
 
-func (c *RedisProductsCache) InvalidateProduct(ctx context.Context, cacheKey string) error {
+func (c *RedisCarsCache) InvalidateCar(ctx context.Context, cacheKey string) error {
 	return c.client.Del(ctx, cacheKey).Err()
 }

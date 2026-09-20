@@ -8,4 +8,4 @@ var ErrItemNotFound = errors.New("item not found")
 
 var ErrItemNotAvailable = errors.New("item not available")
 
-var ErrProductAlreadyExists = errors.New("product already exists")
+var ErrCarAlreadyExists = errors.New("car already exists")
