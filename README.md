@@ -17,3 +17,28 @@
 ## Future development plan
 - Introduce versioned DB migration and remove repo.Migrate() / GORM AutoMigrate()
 - payments, search, image storage, authentication, notifications, and a gateway
+
+## Local development
+
+Start PostgreSQL and Redis from the repository root:
+
+```bash
+docker compose up -d
+```
+
+Check that both containers are healthy:
+
+```bash
+docker compose ps
+```
+
+Then start the car service from its directory:
+
+```bash
+cd car-service
+cp .env.example .env # only needed if .env does not already exist
+go run ./cmd/web
+```
+
+The service uses PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.
+Stop the dependencies with `docker compose down`. Their data persists in Docker volumes; use `docker compose down -v` only when you intentionally want to delete local database and cache data.
