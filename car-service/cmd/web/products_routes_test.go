@@ -355,14 +355,22 @@ func TestCreateProduct(t *testing.T) {
 	}
 
 	tests := []struct {
-		testName     string
-		palyload     Palyload
-		expectedCode int
+		testName            string
+		palyload            Palyload
+		expectedCode        int
+		expectedProductName string
 	}{
 		{
-			testName:     "Product created",
-			palyload:     Palyload{Name: "test", PriceCents: 1},
-			expectedCode: http.StatusCreated,
+			testName:            "Product created",
+			palyload:            Palyload{Name: "test", PriceCents: 1},
+			expectedCode:        http.StatusCreated,
+			expectedProductName: "test",
+		},
+		{
+			testName:            "Product created with trimmed name",
+			palyload:            Palyload{Name: "   test   ", PriceCents: 1},
+			expectedCode:        http.StatusCreated,
+			expectedProductName: "test",
 		},
 		{
 			testName:     "Failed to create product - blank name",
@@ -397,13 +405,17 @@ func TestCreateProduct(t *testing.T) {
 					t.Fatalf("failed to decode response: %v", err)
 				}
 
-				if resp.Item.Name != test.palyload.Name {
-					t.Fatalf("expected item name %s, got %s", test.palyload.Name, resp.Item.Name)
+				if resp.Item.Name != test.expectedProductName {
+					t.Fatalf("expected name in response %s, got %s", test.expectedProductName, resp.Item.Name)
 				}
 
 				var createdProduct domain.Product
 				if err := db.First(&createdProduct, resp.Item.ID).Error; err != nil {
 					t.Fatalf("product with ID %d not found in DB", resp.Item.ID)
+				}
+
+				if createdProduct.Name != test.expectedProductName {
+					t.Fatalf("expected name in DB %s, got %s", test.expectedProductName, createdProduct.Name)
 				}
 			}
 		})
@@ -420,22 +432,32 @@ func TestUpdateProduct(t *testing.T) {
 	const unavailableProductName = "this name is taken"
 
 	tests := []struct {
-		testName     string
-		payload      Payload
-		hasValidId   bool
-		expectedCode int
+		testName            string
+		payload             Payload
+		hasValidId          bool
+		expectedCode        int
+		expectedProductName string
 	}{
 		{
-			testName:     "success - full update",
-			payload:      Payload{Name: strPtr(updatedProductName), PriceCents: int64Ptr(10)},
-			hasValidId:   true,
-			expectedCode: http.StatusOK,
+			testName:            "success - full update",
+			payload:             Payload{Name: strPtr(updatedProductName), PriceCents: int64Ptr(10)},
+			hasValidId:          true,
+			expectedCode:        http.StatusOK,
+			expectedProductName: updatedProductName,
 		},
 		{
-			testName:     "success - update name only",
-			payload:      Payload{Name: strPtr(updatedProductName)},
-			hasValidId:   true,
-			expectedCode: http.StatusOK,
+			testName:            "success - update name only",
+			payload:             Payload{Name: strPtr(updatedProductName)},
+			hasValidId:          true,
+			expectedCode:        http.StatusOK,
+			expectedProductName: updatedProductName,
+		},
+		{
+			testName:            "success - name is trimmed",
+			payload:             Payload{Name: strPtr(" " + updatedProductName + " ")},
+			hasValidId:          true,
+			expectedCode:        http.StatusOK,
+			expectedProductName: updatedProductName,
 		},
 		{
 			testName:     "success - update price_cents only",
@@ -508,8 +530,11 @@ func TestUpdateProduct(t *testing.T) {
 				db.First(&updated, currentProduct.ID)
 
 				if test.payload.Name != nil {
-					if updated.Name != *test.payload.Name {
-						t.Fatalf("expected name %s, got %s", *test.payload.Name, updated.Name)
+					if updated.Name != test.expectedProductName {
+						t.Fatalf("expected name in DB %s, got %s", test.expectedProductName, updated.Name)
+					}
+					if resp.Item.Name != test.expectedProductName {
+						t.Fatalf("expected name in response %s, got %s", test.expectedProductName, resp.Item.Name)
 					}
 				} else {
 					if updated.Name != currentProduct.Name {
