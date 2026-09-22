@@ -4,16 +4,15 @@ services:
   postgres:
     image: postgres:18.1
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-      TZ: ${DB_TIMEZONE}
+      POSTGRES_USER: car_service_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: car_service
     ports:
-      - "${DB_PORT}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/18/docker
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U car_service_user -d car_service"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,7 +21,7 @@ services:
     image: redis:8.4.0
     command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
-      - "${REDIS_PORT}:6379"
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,7 +36,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
 
   grafana:
     image: grafana/grafana:12.3
