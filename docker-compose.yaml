@@ -4,24 +4,19 @@ services:
   car-service:
     build:
       context: ./car-service
+    env_file:
+      - ./car-service/.env
     image: car-service:local
     ports:
       - "8080:8080"
     environment:
       - DB_HOST=postgres
-      - DB_USER=car_service_user
-      - DB_PASSWORD=password
-      - DB_NAME=car_service
-      - DB_PORT=5432
-      - DB_SSLMODE=disable
-      - DB_TIMEZONE=UTC
       - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
-      - REDIS_PASSWORD=
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   postgres:
     image: postgres:18.1
@@ -67,7 +62,10 @@ services:
       - prometheus
     ports:
       - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
 
 volumes:
   postgres_data:
   redis_data:
+  grafana_data:
