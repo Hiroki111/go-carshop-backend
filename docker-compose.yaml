@@ -2,6 +2,7 @@ name: go-carshop-backend
 
 services:
   car-service:
+    container_name: car-service
     build:
       context: ./car-service
     env_file:
@@ -20,6 +21,7 @@ services:
 
   postgres:
     image: postgres:18.1
+    container_name: car-service-db
     environment:
       POSTGRES_USER: car_service_user
       POSTGRES_PASSWORD: password
@@ -36,6 +38,7 @@ services:
 
   redis:
     image: redis:8.4.0
+    container_name: car-service-redis
     command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
       - "6379:6379"
