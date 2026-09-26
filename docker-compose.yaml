@@ -11,15 +11,15 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DB_HOST=postgres
+      - DB_HOST=car-service-db
       - REDIS_HOST=redis
     depends_on:
-      postgres:
+      car-service-db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  postgres:
+  car-service-db:
     image: postgres:18.1
     container_name: car-service-db
     environment:
@@ -29,9 +29,26 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/18/docker
+      - car_service_postgres_data:/var/lib/postgresql/18/docker
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U car_service_user -d car_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  order-service-db:
+    image: postgres:18.1
+    container_name: order-service-db
+    environment:
+      POSTGRES_USER: order_service_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: order_service
+    ports:
+      - "5433:5432"
+    volumes:
+      - order_service_postgres_data:/var/lib/postgresql/18/docker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_service_user -d order_service"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -69,6 +86,7 @@ services:
       - grafana_data:/var/lib/grafana
 
 volumes:
-  postgres_data:
+  car_service_postgres_data:
+  order_service_postgres_data:
   redis_data:
   grafana_data:
