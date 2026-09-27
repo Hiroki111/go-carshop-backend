@@ -17,7 +17,7 @@ func routes(handler *handler.Handler) http.Handler {
 	mux.Route("/", func(r chi.Router) {
 		r.Use(middleware.Recoverer)
 
-		r.Post("/orders", handler.CreateOrder)
+		r.Post("/orders", handler.RequireToken(handler.CreateOrder))
 		r.Get("/orders", handler.GetOrders)
 		r.Get("/orders/{id}", handler.GetOrderById)
 		r.Patch("/orders/{id}", handler.UpdateOrder)

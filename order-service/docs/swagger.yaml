@@ -42,13 +42,12 @@ definitions:
     type: object
   handler.OrderItem:
     properties:
-      car_name:
-        type: string
-      customer_name:
-        type: string
       id:
         type: integer
       price_cents:
+        description: |-
+          CustomerName string `json:"customer_name"`
+          CarName      string `json:"car_name"`
         type: integer
     type: object
   handler.UpdateOrderRequest:
@@ -128,7 +127,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Places an order for a specific product. Requires Customer role.
+      description: Places an order for a specific product. Requires Admin or Customer
+        role.
       parameters:
       - description: Order Payload
         in: body

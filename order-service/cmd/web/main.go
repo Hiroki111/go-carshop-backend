@@ -46,6 +46,11 @@ func main() {
 	// NOTE: Ignore error; variables might be injected by Docker/K8s
 	_ = godotenv.Load()
 
+	key := os.Getenv("SECRET_KEY")
+	if key == "" {
+		log.Fatal("SECRET_KEY not set")
+	}
+
 	db, err := newPostgresDB()
 	if err != nil {
 		log.Fatal(err)

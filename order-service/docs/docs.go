@@ -107,7 +107,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Places an order for a specific product. Requires Customer role.",
+                "description": "Places an order for a specific product. Requires Admin or Customer role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -419,16 +419,11 @@ const docTemplate = `{
         "handler.OrderItem": {
             "type": "object",
             "properties": {
-                "car_name": {
-                    "type": "string"
-                },
-                "customer_name": {
-                    "type": "string"
-                },
                 "id": {
                     "type": "integer"
                 },
                 "price_cents": {
+                    "description": "CustomerName string ` + "`" + `json:\"customer_name\"` + "`" + `\nCarName      string ` + "`" + `json:\"car_name\"` + "`" + `",
                     "type": "integer"
                 }
             }

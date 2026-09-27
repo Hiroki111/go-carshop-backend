@@ -14,7 +14,7 @@ import (
 
 // CreateOrder godoc
 // @Summary      Create a new order
-// @Description  Places an order for a specific product. Requires Customer role.
+// @Description  Places an order for a specific product. Requires Admin or Customer role.
 // @Tags         orders
 // @Accept       json
 // @Produce      json
@@ -26,12 +26,13 @@ import (
 // @Failure      409    {object}  ErrorResponse
 // @Router       /orders [post]
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
-	// TODO: userId is supposed to be given via a JWT token.
-	// The token will be checked by API gateway.
-	// If the token is deemed valid, API gateway should retrieve a userId from a parsed token.
-	// After that, the userId will be sent from API gateway to order-service in a request header.
-	// Replace the following line, so that userId is retreived from a request header.
-	userId := uint(1)
+	userId, ok := r.Context().Value(UserIDKey).(uint)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{
+			Error: "unauthorized",
+		})
+		return
+	}
 
 	var req CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

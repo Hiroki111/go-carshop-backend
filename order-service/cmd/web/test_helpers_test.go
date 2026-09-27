@@ -19,6 +19,7 @@ import (
 
 func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
 	t.Helper()
+	t.Setenv("SECRET_KEY", "test-secret")
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		TranslateError: true,
