@@ -1,1 +1,4 @@
 **/.env
+
+go.work
+go.work.sum
