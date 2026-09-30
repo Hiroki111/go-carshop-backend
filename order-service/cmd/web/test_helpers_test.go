@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/carclient"
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/carclient/carclienttest"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/domain"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/handler"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/repository"
@@ -17,7 +19,11 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
+// setupTestApp wires up the app for tests. Pass nil for carClient to get the
+// default carclienttest.FakeCarClient (every car exists and is available);
+// pass a *carclienttest.FakeCarClient with GetCarByIDFunc set to exercise a
+// specific scenario.
+func setupTestApp(t *testing.T, carClient carclient.CarClient) (http.Handler, *gorm.DB) {
 	t.Helper()
 	t.Setenv("SECRET_KEY", "test-secret")
 
@@ -35,7 +41,11 @@ func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
 		t.Fatalf("migration failed: %v", err)
 	}
 
-	service := service.NewService(repo)
+	if carClient == nil {
+		carClient = &carclienttest.FakeCarClient{}
+	}
+
+	service := service.NewService(repo, carClient)
 
 	handler := handler.NewHandler(service)
 	return routes(handler), db

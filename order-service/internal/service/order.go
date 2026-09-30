@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
+	"errors"
 
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/carclient"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/domain"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/repository"
-	"gorm.io/gorm"
 )
 
 type GetOrderParameters struct {
@@ -17,32 +18,32 @@ type GetOrderParameters struct {
 }
 
 func (s *Service) CreateOrder(ctx context.Context, userId uint, carId uint) error {
-	var order domain.Order
-
-	// TODO: Update this block.
-	// car-service is now an independent service, so order-service can't get car-service's DB.
-	err := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// car, err := s.repo.GetCarForUpdate(tx, carId)
-		// if err != nil {
-		// 	return err
-		// }
-
-		// if err := s.repo.UpdateCarAvailability(tx, carId, false); err != nil {
-		// 	return err
-		// }
-
-		order = domain.Order{
-			UserID: userId,
-			CarID:  carId,
-			// TODO: PriceCents must be retreived from a car that can be found by carId. Fix this.
-			PriceCents: 100,
+	car, err := s.carClient.GetCarByID(ctx, carId)
+	if err != nil {
+		if errors.Is(err, carclient.ErrCarNotFound) {
+			return repository.ErrItemNotFound
 		}
-		if err := s.repo.CreateOrderWithTx(tx, order); err != nil {
-			return err
-		}
-		return nil
-	})
-	return err
+		return err
+	}
+
+	if !car.IsAvailable {
+		return repository.ErrItemNotAvailable
+	}
+
+	order := domain.Order{
+		UserID:     userId,
+		CarID:      carId,
+		CarName:    car.Name,
+		PriceCents: car.PriceCents,
+	}
+
+	// No explicit transaction needed here: order-service only writes to its
+	// own single row now that car availability lives in car-service's own
+	// database. Making the "check availability, then place the order"
+	// sequence safe against two customers racing for the same car is a
+	// separate concern (see the concurrency-safe reservation item in the
+	// project README) - not solved by a local DB transaction anymore.
+	return s.repo.CreateOrderWithTx(nil, order)
 }
 
 func (s *Service) GetOrdersWithTotalCount(ctx context.Context, params GetOrderParameters) ([]domain.Order, uint, error) {

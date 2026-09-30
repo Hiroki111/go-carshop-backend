@@ -12,13 +12,13 @@ type CreateOrderResponse struct {
 	Message string `json:"message"`
 }
 
-// TODO: OrderItem is an object that contains an ordder's information, including the customer and car name.
-// Find out how to get the customer and car name and add them to an OrderItem
+// TODO: CustomerName should be added once a user service exists to resolve
+// a UserID into a display name.
 type OrderItem struct {
 	ID uint `json:"id"`
 	// CustomerName string `json:"customer_name"`
-	// CarName      string `json:"car_name"`
-	PriceCents uint `json:"price_cents"`
+	CarName    string `json:"car_name"`
+	PriceCents uint   `json:"price_cents"`
 }
 
 type GetOrdersResponse struct {

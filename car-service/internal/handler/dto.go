@@ -5,17 +5,18 @@ type ErrorResponse struct {
 }
 
 type CarItem struct {
-	ID         uint   `json:"id"`
-	Name       string `json:"name"`
-	PriceCents uint   `json:"price_cents"`
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	PriceCents  uint   `json:"price_cents"`
+	IsAvailable bool   `json:"is_available"`
 }
 
 type GetCarsResponse struct {
 	Items   []CarItem `json:"items"`
-	Page    int           `json:"page"`
-	Limit   int           `json:"limit"`
-	Total   int           `json:"total"`
-	HasNext bool          `json:"hasNext"`
+	Page    int       `json:"page"`
+	Limit   int       `json:"limit"`
+	Total   int       `json:"total"`
+	HasNext bool      `json:"hasNext"`
 }
 
 type GetCarResponse struct {

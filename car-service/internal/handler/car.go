@@ -103,9 +103,10 @@ func mapCarsToCarItems(cars []domain.Car) []CarItem {
 	items := make([]CarItem, len(cars))
 	for i, car := range cars {
 		items[i] = CarItem{
-			ID:         car.ID,
-			Name:       car.Name,
-			PriceCents: car.PriceCents,
+			ID:          car.ID,
+			Name:        car.Name,
+			PriceCents:  car.PriceCents,
+			IsAvailable: car.IsAvailable,
 		}
 	}
 
@@ -152,9 +153,10 @@ func (h *Handler) GetCarById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	carItem := CarItem{
-		ID:         car.ID,
-		Name:       car.Name,
-		PriceCents: car.PriceCents,
+		ID:          car.ID,
+		Name:        car.Name,
+		PriceCents:  car.PriceCents,
+		IsAvailable: car.IsAvailable,
 	}
 	writeJSON(w, http.StatusOK, GetCarResponse{
 		Item: carItem,
@@ -211,9 +213,10 @@ func (h *Handler) CreateCar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	item := CarItem{
-		ID:         car.ID,
-		Name:       car.Name,
-		PriceCents: car.PriceCents,
+		ID:          car.ID,
+		Name:        car.Name,
+		PriceCents:  car.PriceCents,
+		IsAvailable: car.IsAvailable,
 	}
 	writeJSON(w, http.StatusCreated, CreateCarResponse{
 		Item: item,
@@ -303,9 +306,10 @@ func (h *Handler) UpdateCar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	item := CarItem{
-		ID:         car.ID,
-		Name:       car.Name,
-		PriceCents: car.PriceCents,
+		ID:          car.ID,
+		Name:        car.Name,
+		PriceCents:  car.PriceCents,
+		IsAvailable: car.IsAvailable,
 	}
 	writeJSON(w, http.StatusOK, UpdateCarResponse{Item: item})
 }

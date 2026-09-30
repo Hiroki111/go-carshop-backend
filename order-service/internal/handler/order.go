@@ -142,6 +142,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	for i, order := range orders {
 		items[i] = OrderItem{
 			ID:         order.ID,
+			CarName:    order.CarName,
 			PriceCents: order.PriceCents,
 		}
 	}
@@ -212,6 +213,7 @@ func (h *Handler) GetOrderById(w http.ResponseWriter, r *http.Request) {
 
 	orderItem := OrderItem{
 		ID:         order.ID,
+		CarName:    order.CarName,
 		PriceCents: order.PriceCents,
 	}
 	writeJSON(w, http.StatusOK, GetOrderResponse{
@@ -271,6 +273,7 @@ func (h *Handler) UpdateOrder(w http.ResponseWriter, r *http.Request) {
 
 	item := OrderItem{
 		ID:         order.ID,
+		CarName:    order.CarName,
 		PriceCents: order.PriceCents,
 	}
 	writeJSON(w, http.StatusOK, UpdateOrderResponse{Item: item})

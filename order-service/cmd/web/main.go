@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/carclient"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/handler"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/repository"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/service"
@@ -51,6 +52,11 @@ func main() {
 		log.Fatal("SECRET_KEY not set")
 	}
 
+	carServiceURL := os.Getenv("CAR_SERVICE_URL")
+	if carServiceURL == "" {
+		log.Fatal("CAR_SERVICE_URL not set")
+	}
+
 	db, err := newPostgresDB()
 	if err != nil {
 		log.Fatal(err)
@@ -61,7 +67,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	service := service.NewService(repo)
+	carClient := carclient.NewHTTPCarClient(carServiceURL)
+
+	service := service.NewService(repo, carClient)
 	h := handler.NewHandler(service)
 
 	server := &http.Server{
