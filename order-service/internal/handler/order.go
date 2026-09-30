@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/config"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/repository"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/service"
@@ -183,13 +184,18 @@ func (h *Handler) GetOrderById(w http.ResponseWriter, r *http.Request) {
 	}
 	id := uint(id64)
 
-	// TODO: Make sure the userId is passed from API gateway via a request header.
-	// If userId isn't provided, return an error here so that `h.service.GetOrderById(id)` won't be called.
-	userId := uint(1)
+	role, roleRetrieved := r.Context().Value(RoleKey).(auth.UserRole)
+	userId, userIdRetrieved := r.Context().Value(UserIDKey).(uint)
+	if !roleRetrieved || !userIdRetrieved {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{
+			Error: "internal error",
+		})
+		return
+	}
 
 	order, err := h.service.GetOrderById(id)
 	if err != nil {
-		if err == repository.ErrItemNotFound {
+		if errors.Is(err, repository.ErrItemNotFound) {
 			writeJSON(w, http.StatusNotFound, ErrorResponse{
 				Error: "item not found",
 			})
@@ -202,9 +208,7 @@ func (h *Handler) GetOrderById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Update the following logic.
-	// An order's detail is available for the customer who made the order and admin users.
-	if order.UserID != userId {
+	if role != auth.AdminRole && order.UserID != userId {
 		writeJSON(w, http.StatusForbidden, ErrorResponse{
 			Error: "forbidden",
 		})

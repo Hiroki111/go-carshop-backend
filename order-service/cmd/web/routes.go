@@ -20,7 +20,7 @@ func routes(handler *handler.Handler) http.Handler {
 
 		r.Post("/orders", handler.RequireToken(handler.CreateOrder))
 		r.Get("/orders", handler.RequireRole(auth.AdminRole, handler.GetOrders))
-		r.Get("/orders/{id}", handler.GetOrderById)
+		r.Get("/orders/{id}", handler.RequireToken(handler.GetOrderById))
 		r.Patch("/orders/{id}", handler.UpdateOrder)
 		r.Delete("/orders/{id}", handler.DeleteOrder)
 	})
