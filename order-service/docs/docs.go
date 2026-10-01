@@ -93,6 +93,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -268,6 +274,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -332,6 +344,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/handler.ErrorResponse"
                         }
@@ -419,11 +437,14 @@ const docTemplate = `{
         "handler.OrderItem": {
             "type": "object",
             "properties": {
+                "car_name": {
+                    "description": "CustomerName string ` + "`" + `json:\"customer_name\"` + "`" + `",
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
                 "price_cents": {
-                    "description": "CustomerName string ` + "`" + `json:\"customer_name\"` + "`" + `\nCarName      string ` + "`" + `json:\"car_name\"` + "`" + `",
                     "type": "integer"
                 }
             }
@@ -431,6 +452,9 @@ const docTemplate = `{
         "handler.UpdateOrderRequest": {
             "type": "object",
             "properties": {
+                "car_name": {
+                    "type": "string"
+                },
                 "price_cents": {
                     "type": "integer"
                 }

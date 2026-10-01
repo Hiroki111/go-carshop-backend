@@ -42,16 +42,18 @@ definitions:
     type: object
   handler.OrderItem:
     properties:
+      car_name:
+        description: CustomerName string `json:"customer_name"`
+        type: string
       id:
         type: integer
       price_cents:
-        description: |-
-          CustomerName string `json:"customer_name"`
-          CarName      string `json:"car_name"`
         type: integer
     type: object
   handler.UpdateOrderRequest:
     properties:
+      car_name:
+        type: string
       price_cents:
         type: integer
     type: object
@@ -113,6 +115,10 @@ paths:
             $ref: '#/definitions/handler.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
@@ -184,6 +190,10 @@ paths:
             $ref: '#/definitions/handler.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "404":
@@ -271,6 +281,10 @@ paths:
             $ref: '#/definitions/handler.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "404":

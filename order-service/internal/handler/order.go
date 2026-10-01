@@ -82,6 +82,7 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 // @Success      200         {object}  GetOrdersResponse
 // @Failure      400         {object}  ErrorResponse
 // @Failure      401         {object}  ErrorResponse
+// @Failure      403         {object}  ErrorResponse
 // @Failure      500         {object}  ErrorResponse
 // @Router       /orders [get]
 func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
@@ -237,6 +238,7 @@ func (h *Handler) GetOrderById(w http.ResponseWriter, r *http.Request) {
 // @Success      200    {object}  UpdateOrderResponse
 // @Failure      400    {object}  ErrorResponse
 // @Failure      401    {object}  ErrorResponse
+// @Failure      403    {object}  ErrorResponse
 // @Failure      404    {object}  ErrorResponse
 // @Failure      500    {object}  ErrorResponse
 // @Router       /orders/{id} [patch]
@@ -294,6 +296,7 @@ func (h *Handler) UpdateOrder(w http.ResponseWriter, r *http.Request) {
 // @Success      200  {object}  DeleteOrderResponse
 // @Failure      400  {object}  ErrorResponse
 // @Failure      401  {object}  ErrorResponse
+// @Failure      403  {object}  ErrorResponse
 // @Failure      404  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Router       /orders/{id} [delete]
