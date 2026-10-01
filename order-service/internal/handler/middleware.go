@@ -19,19 +19,19 @@ func (h *Handler) RequireToken(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "unauthorized"})
 			return
 		}
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "unauthorized"})
 			return
 		}
 
 		userId, role, err := auth.ParseJWTToken(parts[1])
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "unauthorized"})
 			return
 		}
 
@@ -46,12 +46,12 @@ func (h *Handler) RequireRole(requiredRole auth.UserRole, next http.HandlerFunc)
 	return h.RequireToken(func(w http.ResponseWriter, r *http.Request) {
 		role, ok := r.Context().Value(RoleKey).(auth.UserRole)
 		if !ok {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "internal error"})
 			return
 		}
 
 		if role != requiredRole {
-			http.Error(w, "forbidden", http.StatusForbidden)
+			writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "forbidden"})
 			return
 		}
 

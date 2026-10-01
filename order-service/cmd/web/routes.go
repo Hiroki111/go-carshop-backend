@@ -21,8 +21,8 @@ func routes(handler *handler.Handler) http.Handler {
 		r.Post("/orders", handler.RequireToken(handler.CreateOrder))
 		r.Get("/orders", handler.RequireRole(auth.AdminRole, handler.GetOrders))
 		r.Get("/orders/{id}", handler.RequireToken(handler.GetOrderById))
-		r.Patch("/orders/{id}", handler.UpdateOrder)
-		r.Delete("/orders/{id}", handler.DeleteOrder)
+		r.Patch("/orders/{id}", handler.RequireRole(auth.AdminRole, handler.UpdateOrder))
+		r.Delete("/orders/{id}", handler.RequireRole(auth.AdminRole, handler.DeleteOrder))
 	})
 
 	// infra / public routes

@@ -261,7 +261,7 @@ func (h *Handler) UpdateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	order, err := h.service.UpdateOrder(repository.UpdateOrderInput{ID: id, PriceCents: payload.PriceCents})
+	order, err := h.service.UpdateOrder(repository.UpdateOrderInput{ID: id, CarName: payload.CarName, PriceCents: payload.PriceCents})
 	if err != nil {
 		if errors.Is(err, repository.ErrItemNotFound) {
 			writeJSON(w, http.StatusNotFound, ErrorResponse{

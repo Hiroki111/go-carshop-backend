@@ -38,7 +38,8 @@ type UpdateOrderResponse struct {
 }
 
 type UpdateOrderRequest struct {
-	PriceCents *uint `json:"price_cents"`
+	PriceCents *uint   `json:"price_cents"`
+	CarName    *string `json:"car_name"`
 }
 
 type DeleteOrderResponse struct {

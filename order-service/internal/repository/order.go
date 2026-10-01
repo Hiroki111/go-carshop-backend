@@ -18,6 +18,7 @@ type GetOrdersInput struct {
 type UpdateOrderInput struct {
 	ID         uint
 	PriceCents *uint
+	CarName    *string
 }
 
 func (r *Repository) GetOrdersWithTotalCount(inputs GetOrdersInput) ([]domain.Order, int64, error) {
@@ -85,6 +86,10 @@ func (r *Repository) UpdateOrder(data UpdateOrderInput) (domain.Order, error) {
 
 	if data.PriceCents != nil {
 		order.PriceCents = *data.PriceCents
+	}
+
+	if data.CarName != nil {
+		order.CarName = *data.CarName
 	}
 
 	if err := r.db.Save(&order).Error; err != nil {
