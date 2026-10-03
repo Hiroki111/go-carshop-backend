@@ -53,6 +53,23 @@ services:
       timeout: 5s
       retries: 5
 
+  user-service-db:
+    image: postgres:18.1
+    container_name: user-service-db
+    environment:
+      POSTGRES_USER: user_service_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user_service
+    ports:
+      - "5434:5432"
+    volumes:
+      - user_service_postgres_data:/var/lib/postgresql/18/docker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_service_user -d user_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:8.4.0
     container_name: car-service-redis
@@ -88,5 +105,6 @@ services:
 volumes:
   car_service_postgres_data:
   order_service_postgres_data:
+  user_service_postgres_data:
   redis_data:
   grafana_data:
