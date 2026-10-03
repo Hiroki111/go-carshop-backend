@@ -106,3 +106,16 @@ Every time you change your annotations or DTOs, you need to regenerate the docs.
 ```
 swag init -g cmd/web/main.go
 ```
+
+### How to start user-service
+
+1. Generate the RSA keypair. Run the following at the root of this `user-service` folder:
+```
+mkdir -p keys
+openssl genrsa -out keys/private.pem 2048
+openssl rsa -in keys/private.pem -pubout -out keys/public.pem
+```
+
+2. Create user-service/.env from .env.example, and set a real ADMIN_PASSWORD.
+
+3. Run `go run ./cmd/web/`.
