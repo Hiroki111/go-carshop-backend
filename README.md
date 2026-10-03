@@ -13,6 +13,8 @@
 - Make message-service idempotent, since Kafka consumers may receive messages more than once.
 - Add Docker Compose early for local execution: PostgreSQL per service, Kafka, and the services.
 - Add structured logging, health endpoints, and tracing once the basic workflow works.
+- Add a centralized key-distribution endpoint: user-service exposes something like `GET /.well-known/jwks.json` serving its current public key(s) in a standard format. Instead of reading a static file once at startup, car-service, order-service, etc periodically fetch and cache that endpoint (say, refresh every few minutes, or re-fetch whenever they see a token signed with an unfamiliar kid).
+- Once Kubernets is introduced, try centralized secret-management tooling (e.g., Vault, AWS Secrets Manager) for key rotation and replace the centralized key-distribution endpoint with it. 
 
 ## Future development plan
 - Introduce versioned DB migration and remove repo.Migrate() / GORM AutoMigrate()
