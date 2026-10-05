@@ -1,7 +1,8 @@
 package auth
 
 import (
-	"os"
+	"crypto/rand"
+	"crypto/rsa"
 	"testing"
 	"time"
 
@@ -9,27 +10,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setSecretKey(t *testing.T) {
+func getKeys(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
 	t.Helper()
-	err := os.Setenv("SECRET_KEY", "test-secret")
-	require.NoError(t, err)
 
-	t.Cleanup(func() {
-		_ = os.Unsetenv("SECRET_KEY")
-	})
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	publicKey := &privateKey.PublicKey
+	return privateKey, publicKey
 }
 
 func TestParseJWTToken_MalformedToken(t *testing.T) {
-	setSecretKey(t)
+	_, publicKey := getKeys(t)
 
-	_, _, err := ParseJWTToken("this.is.not.a.jwt")
+	_, _, err := ParseJWTToken(publicKey, "this.is.not.a.jwt")
 	require.Error(t, err)
 }
 
 func TestParseJWTToken_ExpiredToken(t *testing.T) {
-	setSecretKey(t)
-
-	secretKey := []byte("test-secret")
+	privateKey, publicKey := getKeys(t)
 
 	claims := Claims{
 		UserID: 1,
@@ -38,25 +36,75 @@ func TestParseJWTToken_ExpiredToken(t *testing.T) {
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(secretKey)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	tokenString, err := token.SignedString(privateKey)
 	require.NoError(t, err)
 
-	_, _, err = ParseJWTToken(tokenString)
+	_, _, err = ParseJWTToken(publicKey, tokenString)
+	require.ErrorIs(t, err, jwt.ErrTokenExpired)
+}
+
+func TestParseJWTToken_NilKey(t *testing.T) {
+	privateKey, _ := getKeys(t)
+
+	userId := uint(1)
+	claims := Claims{
+		UserID: userId,
+		Role:   AdminRole,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Minute)),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	tokenString, err := token.SignedString(privateKey)
+	require.NoError(t, err)
+
+	_, _, err = ParseJWTToken(nil, tokenString)
 	require.Error(t, err)
 }
 
 func TestParseJWTToken_ValidToken(t *testing.T) {
-	setSecretKey(t)
+	privateKey, publicKey := getKeys(t)
 
-	userID := uint(1)
-	role := AdminRole
+	userId := uint(1)
+	claims := Claims{
+		UserID: userId,
+		Role:   AdminRole,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Minute)),
+		},
+	}
 
-	tokenString, err := GenerateJWTToken(userID, role)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	tokenString, err := token.SignedString(privateKey)
 	require.NoError(t, err)
 
-	parsedUserID, parsedRole, err := ParseJWTToken(tokenString)
+	parsedUserID, parsedRole, err := ParseJWTToken(publicKey, tokenString)
 	require.NoError(t, err)
-	require.Equal(t, userID, parsedUserID)
-	require.Equal(t, role, parsedRole)
+	require.Equal(t, userId, parsedUserID)
+	require.Equal(t, AdminRole, parsedRole)
+}
+
+func TestParseJWTToken_RejectsOtherRSAAlgorithms(t *testing.T) {
+	privateKey, publicKey := getKeys(t)
+	claims := Claims{
+		UserID: 1, Role: AdminRole,
+		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute))},
+	}
+	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodRS512, claims).SignedString(privateKey)
+	require.NoError(t, err)
+
+	_, _, err = ParseJWTToken(publicKey, tokenString)
+	require.Error(t, err)
+}
+
+func TestParseJWTToken_RejectsMissingExpiry(t *testing.T) {
+	privateKey, publicKey := getKeys(t)
+	claims := Claims{UserID: 1, Role: AdminRole}
+	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privateKey)
+	require.NoError(t, err)
+
+	_, _, err = ParseJWTToken(publicKey, tokenString)
+	require.Error(t, err)
 }

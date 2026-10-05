@@ -29,7 +29,7 @@ func (h *Handler) RequireToken(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		userId, role, err := auth.ParseJWTToken(parts[1])
+		userId, role, err := auth.ParseJWTToken(h.publicKey, parts[1])
 		if err != nil {
 			writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "unauthorized"})
 			return

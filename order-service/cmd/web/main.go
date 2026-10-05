@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/carclient"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/handler"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/repository"
@@ -47,9 +48,13 @@ func main() {
 	// NOTE: Ignore error; variables might be injected by Docker/K8s
 	_ = godotenv.Load()
 
-	key := os.Getenv("SECRET_KEY")
-	if key == "" {
-		log.Fatal("SECRET_KEY not set")
+	publicKeyPath := os.Getenv("PUBLIC_KEY_PATH")
+	if publicKeyPath == "" {
+		log.Fatal("PUBLIC_KEY_PATH not set")
+	}
+	publicKey, err := auth.LoadPublicKey(publicKeyPath)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	carServiceURL := os.Getenv("CAR_SERVICE_URL")
@@ -70,7 +75,7 @@ func main() {
 	carClient := carclient.NewHTTPCarClient(carServiceURL)
 
 	service := service.NewService(repo, carClient)
-	h := handler.NewHandler(service)
+	h := handler.NewHandler(service, publicKey)
 
 	server := &http.Server{
 		Addr:    portNumber,
