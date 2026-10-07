@@ -24,7 +24,9 @@ import (
 // @Success      201    {object}  CreateOrderResponse
 // @Failure      400    {object}  ErrorResponse
 // @Failure      401    {object}  ErrorResponse
+// @Failure      404    {object}  ErrorResponse
 // @Failure      409    {object}  ErrorResponse
+// @Failure      500    {object}  ErrorResponse
 // @Router       /orders [post]
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userId, ok := r.Context().Value(UserIDKey).(uint)
@@ -74,9 +76,9 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        orderBy     query  string false "field to sort by (id, price_cents, created_at)"
-// @Param        sortIn      query  string false "sort direction (asc, desc)"
-// @Param        car_ids query  string false "comma-separated car IDs to filter"
+// @Param        orderBy     query  string false "field to sort by (car_id, user_id, created_at); unknown values fall back to created_at"
+// @Param        sortIn      query  string false "sort direction (asc, desc); unknown values fall back to asc"
+// @Param        car_ids     query  string false "comma-separated car IDs to filter"
 // @Param        page        query  int    false "page number"
 // @Param        limit       query  int    false "items per page"
 // @Success      200         {object}  GetOrdersResponse

@@ -41,7 +41,7 @@ func (r *Repository) GetOrdersWithTotalCount(inputs GetOrdersInput) ([]domain.Or
 		orderBy = inputs.OrderBy
 	}
 
-	query = query.Order(orderBy + " " + sortIn)
+	query = query.Order(orderBy + " " + sortIn).Order("id asc")
 
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err

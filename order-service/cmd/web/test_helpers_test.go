@@ -2,72 +2,105 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/carclient"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/carclient/carclienttest"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/domain"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/handler"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/repository"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/service"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-// setupTestApp wires up the app for tests. Pass nil for carClient to get the
-// default carclienttest.FakeCarClient (every car exists and is available);
-// pass a *carclienttest.FakeCarClient with GetCarByIDFunc set to exercise a
-// specific scenario.
-func setupTestApp(t *testing.T, carClient carclient.CarClient) (http.Handler, *gorm.DB) {
+func newTestKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()
-	t.Setenv("SECRET_KEY", "test-secret")
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	return key
+}
+
+func signRS256(t *testing.T, key *rsa.PrivateKey, userID uint, role auth.UserRole, expiresAt time.Time) string {
+	t.Helper()
+	claims := auth.Claims{
+		UserID:           userID,
+		Role:             role,
+		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(expiresAt)},
+	}
+	s, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(key)
+	require.NoError(t, err)
+	return s
+}
+
+func tokenFor(t *testing.T, key *rsa.PrivateKey, userID uint, role auth.UserRole) string {
+	t.Helper()
+	return signRS256(t, key, userID, role, time.Now().Add(time.Hour))
+}
+
+// setupTestApp wires up the app for tests and returns the app, its database,
+// and the private key whose public half the app trusts. Tokens must be signed
+// with that key to be accepted.
+//
+// Pass nil for carClient to get the default carclienttest.FakeCarClient
+// (every car exists and is available); pass a *carclienttest.FakeCarClient
+// with GetCarByIDFunc set to exercise a specific scenario.
+func setupTestApp(t *testing.T, carClient carclient.CarClient) (http.Handler, *gorm.DB, *rsa.PrivateKey) {
+	t.Helper()
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		TranslateError: true,
 		Logger:         logger.Default.LogMode(logger.Silent),
 	})
-	if err != nil {
-		t.Fatalf("failed to open sqlite db: %v", err)
-	}
+	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 
 	repo := repository.NewRepository(db)
-
-	if err := repo.Migrate(); err != nil {
-		t.Fatalf("migration failed: %v", err)
-	}
+	require.NoError(t, repo.Migrate())
 
 	if carClient == nil {
 		carClient = &carclienttest.FakeCarClient{}
 	}
 
-	service := service.NewService(repo, carClient)
+	svc := service.NewService(repo, carClient)
+	trustedKey := newTestKey(t)
+	h := handler.NewHandler(svc, &trustedKey.PublicKey)
 
-	handler := handler.NewHandler(service)
-	return routes(handler), db
+	return routes(h), db, trustedKey
 }
 
 func executeRequest(
 	t *testing.T,
 	app http.Handler,
-	method, path string,
+	method, path, token string,
 	body any,
 ) *httptest.ResponseRecorder {
 	t.Helper()
 
 	var buf bytes.Buffer
 	if body != nil {
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
-			t.Fatalf("failed to encode body: %v", err)
-		}
+		require.NoError(t, json.NewEncoder(&buf).Encode(body))
 	}
 
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	rec := httptest.NewRecorder()
 	app.ServeHTTP(rec, req)
@@ -75,23 +108,22 @@ func executeRequest(
 	return rec
 }
 
-func strPtr(s string) *string {
-	return &s
-}
+func decodeBody[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
 
-func int64Ptr(i int64) *int64 {
-	return &i
+	var v T
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&v))
+	return v
 }
 
 func seedOrders(t *testing.T, db *gorm.DB, orders []domain.Order) []domain.Order {
 	t.Helper()
 
+	base := time.Now()
 	seededOrders := make([]domain.Order, len(orders))
 	for i, order := range orders {
-		order.CreatedAt = time.Now().Add(time.Duration(i) * time.Second)
-		if result := db.Create(&order); result.Error != nil {
-			t.Fatal(result.Error)
-		}
+		order.CreatedAt = base.Add(time.Duration(i) * time.Second)
+		require.NoError(t, db.Create(&order).Error)
 		seededOrders[i] = order
 	}
 
