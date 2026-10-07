@@ -39,13 +39,13 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "field to sort by (id, price_cents, created_at)",
+                        "description": "field to sort by (car_id, user_id, created_at); unknown values fall back to created_at",
                         "name": "orderBy",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "sort direction (asc, desc)",
+                        "description": "sort direction (asc, desc); unknown values fall back to asc",
                         "name": "sortIn",
                         "in": "query"
                     },
@@ -148,8 +148,20 @@
                             "$ref": "#/definitions/handler.ErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/handler.ErrorResponse"
                         }

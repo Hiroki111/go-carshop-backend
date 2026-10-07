@@ -82,11 +82,12 @@ paths:
       - application/json
       description: Returns a paginated list of orders. Requires Admin role.
       parameters:
-      - description: field to sort by (id, price_cents, created_at)
+      - description: field to sort by (car_id, user_id, created_at); unknown values
+          fall back to created_at
         in: query
         name: orderBy
         type: string
-      - description: sort direction (asc, desc)
+      - description: sort direction (asc, desc); unknown values fall back to asc
         in: query
         name: sortIn
         type: string
@@ -157,8 +158,16 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "409":
           description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
       security:
