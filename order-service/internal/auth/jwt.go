@@ -15,14 +15,21 @@ const (
 )
 
 type Claims struct {
-	UserID uint     `json:"user_id"`
-	Role   UserRole `json:"role"`
+	UserID   uint     `json:"user_id"`
+	UserName string   `json:"user_name"`
+	Role     UserRole `json:"role"`
 	jwt.RegisteredClaims
 }
 
-func ParseJWTToken(publicKey *rsa.PublicKey, tokenString string) (uint, UserRole, error) {
+type Identity struct {
+	UserID   uint
+	UserName string
+	Role     UserRole
+}
+
+func ParseJWTToken(publicKey *rsa.PublicKey, tokenString string) (Identity, error) {
 	if publicKey == nil {
-		return 0, "", errors.New("public key not configured")
+		return Identity{}, errors.New("public key not configured")
 	}
 
 	token, err := jwt.ParseWithClaims(
@@ -34,17 +41,21 @@ func ParseJWTToken(publicKey *rsa.PublicKey, tokenString string) (uint, UserRole
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
-		return 0, "", err
+		return Identity{}, err
 	}
 
 	if !token.Valid {
-		return 0, "", errors.New("invalid token")
+		return Identity{}, errors.New("invalid token")
 	}
 
 	claims, ok := token.Claims.(*Claims)
 	if !ok {
-		return 0, "", errors.New("unknown claims type, cannot parse the token")
+		return Identity{}, errors.New("unknown claims type, cannot parse the token")
 	}
 
-	return claims.UserID, claims.Role, nil
+	return Identity{
+		UserID:   claims.UserID,
+		UserName: claims.UserName,
+		Role:     claims.Role,
+	}, nil
 }

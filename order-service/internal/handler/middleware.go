@@ -11,8 +11,9 @@ import (
 type contextKey string
 
 const (
-	UserIDKey contextKey = "userID"
-	RoleKey   contextKey = "role"
+	UserIDKey   contextKey = "userID"
+	UserNameKey contextKey = "userName"
+	RoleKey     contextKey = "role"
 )
 
 func (h *Handler) RequireToken(next http.HandlerFunc) http.HandlerFunc {
@@ -29,14 +30,15 @@ func (h *Handler) RequireToken(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		userId, role, err := auth.ParseJWTToken(h.publicKey, parts[1])
+		identity, err := auth.ParseJWTToken(h.publicKey, parts[1])
 		if err != nil {
 			writeJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "unauthorized"})
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), UserIDKey, userId)
-		ctx = context.WithValue(ctx, RoleKey, role)
+		ctx := context.WithValue(r.Context(), UserIDKey, identity.UserID)
+		ctx = context.WithValue(ctx, UserNameKey, identity.UserName)
+		ctx = context.WithValue(ctx, RoleKey, identity.Role)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}

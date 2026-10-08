@@ -17,7 +17,7 @@ type GetOrderParameters struct {
 	Limit   int
 }
 
-func (s *Service) CreateOrder(ctx context.Context, userId uint, carId uint) error {
+func (s *Service) CreateOrder(ctx context.Context, userId uint, userName string, carId uint) error {
 	car, err := s.carClient.GetCarByID(ctx, carId)
 	if err != nil {
 		if errors.Is(err, carclient.ErrCarNotFound) {
@@ -32,6 +32,7 @@ func (s *Service) CreateOrder(ctx context.Context, userId uint, carId uint) erro
 
 	order := domain.Order{
 		UserID:     userId,
+		UserName:   userName,
 		CarID:      carId,
 		CarName:    car.Name,
 		PriceCents: car.PriceCents,

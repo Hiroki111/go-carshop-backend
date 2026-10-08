@@ -31,10 +31,13 @@ func newTestKey(t *testing.T) *rsa.PrivateKey {
 	return key
 }
 
-func signRS256(t *testing.T, key *rsa.PrivateKey, userID uint, role auth.UserRole, expiresAt time.Time) string {
+const defaultTestUserName = "test user"
+
+func signRS256(t *testing.T, key *rsa.PrivateKey, userID uint, userName string, role auth.UserRole, expiresAt time.Time) string {
 	t.Helper()
 	claims := auth.Claims{
 		UserID:           userID,
+		UserName:         userName,
 		Role:             role,
 		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(expiresAt)},
 	}
@@ -45,7 +48,7 @@ func signRS256(t *testing.T, key *rsa.PrivateKey, userID uint, role auth.UserRol
 
 func tokenFor(t *testing.T, key *rsa.PrivateKey, userID uint, role auth.UserRole) string {
 	t.Helper()
-	return signRS256(t, key, userID, role, time.Now().Add(time.Hour))
+	return signRS256(t, key, userID, defaultTestUserName, role, time.Now().Add(time.Hour))
 }
 
 // setupTestApp wires up the app for tests and returns the app, its database,

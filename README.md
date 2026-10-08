@@ -11,7 +11,7 @@
 - Use Kafka events such as order.created.
 - Implement the transactional outbox pattern eventually, so saving an order and publishing its event remain reliable even during failures.
 - Make message-service idempotent, since Kafka consumers may receive messages more than once.
-- Add Docker Compose early for local execution: PostgreSQL per service, Kafka, and the services.
+- Introduce refresh tokens to user-service. When a user logs in, user-service creates an access token and a refresh token and saves the refresh token's hash in a refresh_tokens table with the user ID and an expiry. When the access token is expired, the UI sends the refresh token to POST /refresh-token. Then, user-service issues a new access token. This requires a refresh_tokens table, /login-user returning a refresh token, POST /refresh-token, POST /logout revoking an existing refresh token, and an access-token TTL of about 15 minutes.
 - Add structured logging, health endpoints, and tracing once the basic workflow works.
 - Add a centralized key-distribution endpoint: user-service exposes something like `GET /.well-known/jwks.json` serving its current public key(s) in a standard format. Instead of reading a static file once at startup, car-service, order-service, etc periodically fetch and cache that endpoint (say, refresh every few minutes, or re-fetch whenever they see a token signed with an unfamiliar kid).
 - Once Kubernets is introduced, try centralized secret-management tooling (e.g., Vault, AWS Secrets Manager) for key rotation and replace the centralized key-distribution endpoint with it. 

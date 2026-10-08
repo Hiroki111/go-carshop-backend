@@ -20,10 +20,11 @@ func newTestKey(t *testing.T) *rsa.PrivateKey {
 	return key
 }
 
-func signRS256(t *testing.T, key *rsa.PrivateKey, userID uint, role auth.UserRole, expiresAt time.Time) string {
+func signRS256(t *testing.T, key *rsa.PrivateKey, userID uint, userName string, role auth.UserRole, expiresAt time.Time) string {
 	t.Helper()
 	claims := auth.Claims{
 		UserID:           userID,
+		UserName:         userName,
 		Role:             role,
 		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(expiresAt)},
 	}
@@ -36,6 +37,7 @@ func signHS256(t *testing.T) string {
 	t.Helper()
 	claims := auth.Claims{
 		UserID:           1,
+		UserName:         "alice",
 		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour))},
 	}
 	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("test-secret"))
@@ -74,12 +76,12 @@ func TestRequireToken(t *testing.T) {
 		},
 		{
 			name:         "expired token",
-			authHeader:   "Bearer " + signRS256(t, trustedKey, 1, auth.AdminRole, time.Now().Add(-time.Hour)),
+			authHeader:   "Bearer " + signRS256(t, trustedKey, 1, "alice", auth.AdminRole, time.Now().Add(-time.Hour)),
 			expectStatus: http.StatusUnauthorized,
 		},
 		{
 			name:         "signed by a different key",
-			authHeader:   "Bearer " + signRS256(t, attackerKey, 1, auth.AdminRole, time.Now().Add(time.Hour)),
+			authHeader:   "Bearer " + signRS256(t, attackerKey, 1, "alice", auth.AdminRole, time.Now().Add(time.Hour)),
 			expectStatus: http.StatusUnauthorized,
 		},
 		{
@@ -89,7 +91,7 @@ func TestRequireToken(t *testing.T) {
 		},
 		{
 			name:           "valid token",
-			authHeader:     "Bearer " + signRS256(t, trustedKey, 123, auth.AdminRole, time.Now().Add(time.Hour)),
+			authHeader:     "Bearer " + signRS256(t, trustedKey, 123, "alice", auth.AdminRole, time.Now().Add(time.Hour)),
 			expectStatus:   http.StatusOK,
 			expectNextCall: true,
 		},
@@ -104,6 +106,7 @@ func TestRequireToken(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 
 				require.Equal(t, uint(123), r.Context().Value(UserIDKey))
+				require.Equal(t, "alice", r.Context().Value(UserNameKey))
 				require.Equal(t, auth.AdminRole, r.Context().Value(RoleKey))
 			})
 			h := &Handler{publicKey: &trustedKey.PublicKey}
@@ -138,18 +141,18 @@ func TestRequireRole_AdminOnlyRoute(t *testing.T) {
 		{name: "no token", expectStatus: http.StatusUnauthorized},
 		{
 			name:           "admin",
-			authHeader:     "Bearer " + signRS256(t, trustedKey, 1, auth.AdminRole, exp),
+			authHeader:     "Bearer " + signRS256(t, trustedKey, 1, "alice", auth.AdminRole, exp),
 			expectStatus:   http.StatusOK,
 			expectNextCall: true,
 		},
 		{
 			name:         "customer",
-			authHeader:   "Bearer " + signRS256(t, trustedKey, 1, auth.CustomerRole, exp),
+			authHeader:   "Bearer " + signRS256(t, trustedKey, 1, "alice", auth.CustomerRole, exp),
 			expectStatus: http.StatusForbidden,
 		},
 		{
 			name:         "token with empty role",
-			authHeader:   "Bearer " + signRS256(t, trustedKey, 1, "", exp),
+			authHeader:   "Bearer " + signRS256(t, trustedKey, 1, "alice", "", exp),
 			expectStatus: http.StatusForbidden,
 		},
 	}

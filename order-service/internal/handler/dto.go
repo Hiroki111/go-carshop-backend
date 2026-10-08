@@ -12,12 +12,10 @@ type CreateOrderResponse struct {
 	Message string `json:"message"`
 }
 
-// TODO: CustomerName should be added once a user service exists to resolve
-// a UserID into a display name.
 type OrderItem struct {
-	ID uint `json:"id"`
-	// CustomerName string `json:"customer_name"`
+	ID         uint   `json:"id"`
 	CarName    string `json:"car_name"`
+	UserName   string `json:"user_name"`
 	PriceCents uint   `json:"price_cents"`
 }
 

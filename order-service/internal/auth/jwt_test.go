@@ -22,7 +22,7 @@ func getKeys(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
 func TestParseJWTToken_MalformedToken(t *testing.T) {
 	_, publicKey := getKeys(t)
 
-	_, _, err := ParseJWTToken(publicKey, "this.is.not.a.jwt")
+	_, err := ParseJWTToken(publicKey, "this.is.not.a.jwt")
 	require.Error(t, err)
 }
 
@@ -30,7 +30,8 @@ func TestParseJWTToken_ExpiredToken(t *testing.T) {
 	privateKey, publicKey := getKeys(t)
 
 	claims := Claims{
-		UserID: 1,
+		UserID:   1,
+		UserName: "alice",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
 		},
@@ -40,17 +41,17 @@ func TestParseJWTToken_ExpiredToken(t *testing.T) {
 	tokenString, err := token.SignedString(privateKey)
 	require.NoError(t, err)
 
-	_, _, err = ParseJWTToken(publicKey, tokenString)
+	_, err = ParseJWTToken(publicKey, tokenString)
 	require.ErrorIs(t, err, jwt.ErrTokenExpired)
 }
 
 func TestParseJWTToken_NilKey(t *testing.T) {
 	privateKey, _ := getKeys(t)
 
-	userId := uint(1)
 	claims := Claims{
-		UserID: userId,
-		Role:   AdminRole,
+		UserID:   1,
+		UserName: "alice",
+		Role:     AdminRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Minute)),
 		},
@@ -60,17 +61,17 @@ func TestParseJWTToken_NilKey(t *testing.T) {
 	tokenString, err := token.SignedString(privateKey)
 	require.NoError(t, err)
 
-	_, _, err = ParseJWTToken(nil, tokenString)
+	_, err = ParseJWTToken(nil, tokenString)
 	require.Error(t, err)
 }
 
 func TestParseJWTToken_ValidToken(t *testing.T) {
 	privateKey, publicKey := getKeys(t)
 
-	userId := uint(1)
 	claims := Claims{
-		UserID: userId,
-		Role:   AdminRole,
+		UserID:   1,
+		UserName: "alice",
+		Role:     AdminRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Minute)),
 		},
@@ -80,31 +81,30 @@ func TestParseJWTToken_ValidToken(t *testing.T) {
 	tokenString, err := token.SignedString(privateKey)
 	require.NoError(t, err)
 
-	parsedUserID, parsedRole, err := ParseJWTToken(publicKey, tokenString)
+	identity, err := ParseJWTToken(publicKey, tokenString)
 	require.NoError(t, err)
-	require.Equal(t, userId, parsedUserID)
-	require.Equal(t, AdminRole, parsedRole)
+	require.Equal(t, Identity{UserID: 1, UserName: "alice", Role: AdminRole}, identity)
 }
 
 func TestParseJWTToken_RejectsOtherRSAAlgorithms(t *testing.T) {
 	privateKey, publicKey := getKeys(t)
 	claims := Claims{
-		UserID: 1, Role: AdminRole,
+		UserID: 1, UserName: "alice", Role: AdminRole,
 		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute))},
 	}
 	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodRS512, claims).SignedString(privateKey)
 	require.NoError(t, err)
 
-	_, _, err = ParseJWTToken(publicKey, tokenString)
+	_, err = ParseJWTToken(publicKey, tokenString)
 	require.Error(t, err)
 }
 
 func TestParseJWTToken_RejectsMissingExpiry(t *testing.T) {
 	privateKey, publicKey := getKeys(t)
-	claims := Claims{UserID: 1, Role: AdminRole}
+	claims := Claims{UserID: 1, UserName: "alice", Role: AdminRole}
 	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privateKey)
 	require.NoError(t, err)
 
-	_, _, err = ParseJWTToken(publicKey, tokenString)
+	_, err = ParseJWTToken(publicKey, tokenString)
 	require.Error(t, err)
 }

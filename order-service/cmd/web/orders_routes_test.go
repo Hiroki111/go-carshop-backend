@@ -22,8 +22,9 @@ import (
 
 func TestCreateOrder(t *testing.T) {
 	const (
-		userID = uint(7)
-		carID  = uint(123)
+		userID   = uint(7)
+		userName = "customer name"
+		carID    = uint(123)
 	)
 	car := carclient.Car{ID: carID, Name: "Test Car", PriceCents: 100}
 
@@ -99,7 +100,7 @@ func TestCreateOrder(t *testing.T) {
 
 			var token string
 			if !test.noToken {
-				token = tokenFor(t, trustedKey, userID, test.role)
+				token = signRS256(t, trustedKey, userID, userName, test.role, time.Now().Add(time.Hour))
 			}
 
 			body := test.body
@@ -123,6 +124,7 @@ func TestCreateOrder(t *testing.T) {
 
 			require.Len(t, orders, 1)
 			require.Equal(t, userID, orders[0].UserID, "the order belongs to the token's user")
+			require.Equal(t, userName, orders[0].UserName, "the order snapshots the token's user name")
 			require.Equal(t, carID, orders[0].CarID)
 			require.Equal(t, car.Name, orders[0].CarName)
 			require.Equal(t, car.PriceCents, orders[0].PriceCents)
@@ -142,10 +144,11 @@ func TestGetOrders_WithSorting(t *testing.T) {
 	// Ties (cherry and banana share user_id 1) are resolved by ID ascending,
 	// i.e. insertion order.
 	seedOrders(t, db, []domain.Order{
-		{CarID: 3, CarName: "cherry", UserID: 1, PriceCents: 200},
-		{CarID: 1, CarName: "apple", UserID: 2, PriceCents: 100},
-		{CarID: 2, CarName: "banana", UserID: 1, PriceCents: 300},
+		{CarID: 3, CarName: "cherry", UserID: 1, UserName: "alice", PriceCents: 200},
+		{CarID: 1, CarName: "apple", UserID: 2, UserName: "bob", PriceCents: 100},
+		{CarID: 2, CarName: "banana", UserID: 1, UserName: "alice", PriceCents: 300},
 	})
+	userNameByCarName := map[string]string{"cherry": "alice", "apple": "bob", "banana": "alice"}
 
 	tests := []struct {
 		testName         string
@@ -183,6 +186,7 @@ func TestGetOrders_WithSorting(t *testing.T) {
 			names := make([]string, len(resp.Items))
 			for i, item := range resp.Items {
 				names[i] = item.CarName
+				require.Equal(t, userNameByCarName[item.CarName], item.UserName)
 			}
 			require.Equal(t, test.expectedCarNames, names)
 		})
@@ -361,7 +365,7 @@ func TestGetOrder_ById(t *testing.T) {
 
 	app, db, trustedKey := setupTestApp(t, nil)
 	order := seedOrders(t, db, []domain.Order{
-		{CarID: 5, CarName: "test car", UserID: ownerID, PriceCents: 100},
+		{CarID: 5, CarName: "test car", UserName: "customer name", UserID: ownerID, PriceCents: 100},
 	})[0]
 
 	tests := []struct {
@@ -398,17 +402,17 @@ func TestGetOrder_ById(t *testing.T) {
 			resp := decodeBody[handler.GetOrderResponse](t, rec)
 			require.Equal(t, order.ID, resp.Item.ID)
 			require.Equal(t, order.CarName, resp.Item.CarName)
+			require.Equal(t, order.UserName, resp.Item.UserName)
 			require.Equal(t, order.PriceCents, resp.Item.PriceCents)
-
-			// TODO: When the response body has a customer's name, validate that `resp.Item` has the customer name here
 		})
 	}
 }
 
 func TestUpdateOrder(t *testing.T) {
 	const (
-		originalName  = "original"
-		originalPrice = uint(100)
+		originalName     = "original"
+		originalCustomer = "original customer"
+		originalPrice    = uint(100)
 	)
 
 	app, db, trustedKey := setupTestApp(t, nil)
@@ -471,7 +475,7 @@ func TestUpdateOrder(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
 			order := seedOrders(t, db, []domain.Order{
-				{CarID: 5, CarName: originalName, UserID: 1, PriceCents: originalPrice},
+				{CarID: 5, CarName: originalName, UserID: 1, UserName: originalCustomer, PriceCents: originalPrice},
 			})[0]
 
 			var token string
@@ -487,12 +491,14 @@ func TestUpdateOrder(t *testing.T) {
 			require.NoError(t, db.First(&updated, order.ID).Error)
 			require.Equal(t, test.wantPrice, updated.PriceCents)
 			require.Equal(t, test.wantCarName, updated.CarName)
+			require.Equal(t, originalCustomer, updated.UserName)
 
 			if test.expectedCode == http.StatusOK {
 				resp := decodeBody[handler.UpdateOrderResponse](t, rec)
 				require.Equal(t, order.ID, resp.Item.ID)
 				require.Equal(t, updated.PriceCents, resp.Item.PriceCents)
 				require.Equal(t, updated.CarName, resp.Item.CarName)
+				require.Equal(t, originalCustomer, resp.Item.UserName)
 			}
 		})
 	}
@@ -555,7 +561,7 @@ func TestOrderRoutes_Authorization(t *testing.T) {
 
 	invalidTokens := map[string]string{
 		"no token":                    "",
-		"expired token":               signRS256(t, trustedKey, 1, auth.AdminRole, time.Now().Add(-time.Hour)),
+		"expired token":               signRS256(t, trustedKey, 1, defaultTestUserName, auth.AdminRole, time.Now().Add(-time.Hour)),
 		"token signed by another key": tokenFor(t, attackerKey, 1, auth.AdminRole),
 	}
 

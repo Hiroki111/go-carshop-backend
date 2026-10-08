@@ -31,5 +31,5 @@ func (s *Service) Login(userName string, password string) (string, error) {
 		return "", ErrInvalidCredentials
 	}
 
-	return auth.GenerateJWTToken(s.privateKey, user.ID, user.Role)
+	return auth.GenerateJWTToken(s.privateKey, user.ID, user.UserName, user.Role)
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/config"
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/domain"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/repository"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/service"
 )
@@ -37,6 +38,14 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userName, ok := r.Context().Value(UserNameKey).(string)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, ErrorResponse{
+			Error: "unauthorized",
+		})
+		return
+	}
+
 	var req CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{
@@ -46,7 +55,7 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	err := h.service.CreateOrder(ctx, userId, req.CarID)
+	err := h.service.CreateOrder(ctx, userId, userName, req.CarID)
 	if err != nil {
 		if errors.Is(err, repository.ErrItemNotFound) {
 			writeJSON(w, http.StatusNotFound, ErrorResponse{
@@ -144,11 +153,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]OrderItem, len(orders))
 	for i, order := range orders {
-		items[i] = OrderItem{
-			ID:         order.ID,
-			CarName:    order.CarName,
-			PriceCents: order.PriceCents,
-		}
+		items[i] = toOrderItem(order)
 	}
 
 	writeJSON(w, http.StatusOK, GetOrdersResponse{
@@ -218,13 +223,8 @@ func (h *Handler) GetOrderById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orderItem := OrderItem{
-		ID:         order.ID,
-		CarName:    order.CarName,
-		PriceCents: order.PriceCents,
-	}
 	writeJSON(w, http.StatusOK, GetOrderResponse{
-		Item: orderItem,
+		Item: toOrderItem(order),
 	})
 }
 
@@ -279,12 +279,7 @@ func (h *Handler) UpdateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item := OrderItem{
-		ID:         order.ID,
-		CarName:    order.CarName,
-		PriceCents: order.PriceCents,
-	}
-	writeJSON(w, http.StatusOK, UpdateOrderResponse{Item: item})
+	writeJSON(w, http.StatusOK, UpdateOrderResponse{Item: toOrderItem(order)})
 }
 
 // DeleteOrder godoc
@@ -329,4 +324,13 @@ func (h *Handler) DeleteOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, DeleteOrderResponse{Message: "success"})
+}
+
+func toOrderItem(order domain.Order) OrderItem {
+	return OrderItem{
+		ID:         order.ID,
+		CarName:    order.CarName,
+		UserName:   order.UserName,
+		PriceCents: order.PriceCents,
+	}
 }
