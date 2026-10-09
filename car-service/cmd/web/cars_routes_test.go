@@ -8,10 +8,13 @@ import (
 	"sort"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/Hiroki111/go-carshop-backend/car-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/config"
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/domain"
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/handler"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestGetCars_WithSorting(t *testing.T) {
@@ -22,7 +25,7 @@ func TestGetCars_WithSorting(t *testing.T) {
 	}
 
 	tests := []struct {
-		orderBy, sortIn             string
+		orderBy, sortIn         string
 		expectedCarNamesInOrder []string
 	}{
 		{orderBy: "name", sortIn: "asc", expectedCarNamesInOrder: []string{"apple", "banana", "cherry"}},
@@ -48,7 +51,7 @@ func TestGetCars_WithSorting(t *testing.T) {
 			app, db := setupTestApp(t)
 			seedCars(t, db, cars)
 
-			rec := executeRequest(t, app, http.MethodGet, path, nil)
+			rec := executeRequest(t, app, http.MethodGet, path, "", nil)
 
 			if rec.Code != http.StatusOK {
 				t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
@@ -79,8 +82,8 @@ func TestGetCars_WithFilteringByName(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                 string
-		keyword              string
+		name             string
+		keyword          string
 		expectedCarNames []string
 	}{
 		{name: "Matching one word", keyword: "ap", expectedCarNames: []string{"apple"}},
@@ -97,7 +100,7 @@ func TestGetCars_WithFilteringByName(t *testing.T) {
 			app, db := setupTestApp(t)
 			seedCars(t, db, cars)
 
-			rec := executeRequest(t, app, http.MethodGet, path, nil)
+			rec := executeRequest(t, app, http.MethodGet, path, "", nil)
 
 			if rec.Code != http.StatusOK {
 				t.Fatalf("expected %d, got %d", http.StatusOK, rec.Code)
@@ -134,10 +137,10 @@ func TestGetCars_WithFilteringByPrice(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                 string
-		minPrice, maxPrice   string
-		expectedCarNames []string
-		expectedCode         int
+		name               string
+		minPrice, maxPrice string
+		expectedCarNames   []string
+		expectedCode       int
 	}{
 		{name: "Matching items", minPrice: "100", maxPrice: "160", expectedCarNames: []string{"$1.00 Car", "$1.50 Car"}, expectedCode: http.StatusOK},
 		{name: "Matching items without minPrice", minPrice: "", maxPrice: "150", expectedCarNames: []string{"$1.00 Car", "$1.50 Car"}, expectedCode: http.StatusOK},
@@ -154,7 +157,7 @@ func TestGetCars_WithFilteringByPrice(t *testing.T) {
 			app, db := setupTestApp(t)
 			seedCars(t, db, cars)
 
-			rec := executeRequest(t, app, http.MethodGet, path, nil)
+			rec := executeRequest(t, app, http.MethodGet, path, "", nil)
 
 			if rec.Code != test.expectedCode {
 				t.Fatalf("expected %d, got %d", test.expectedCode, rec.Code)
@@ -252,7 +255,7 @@ func TestGetCars_WithPagination(t *testing.T) {
 			app, db := setupTestApp(t)
 			seedCars(t, db, cars)
 
-			rec := executeRequest(t, app, http.MethodGet, path, nil)
+			rec := executeRequest(t, app, http.MethodGet, path, "", nil)
 
 			if rec.Code != test.expectedCode {
 				t.Fatalf("expected %d, got %d", test.expectedCode, rec.Code)
@@ -323,7 +326,7 @@ func TestGetCar_ById(t *testing.T) {
 			id := test.getId(t, cars)
 			path := fmt.Sprintf("/cars/%s", id)
 
-			rec := executeRequest(t, app, http.MethodGet, path, nil)
+			rec := executeRequest(t, app, http.MethodGet, path, "", nil)
 
 			if rec.Code != test.expectedCode {
 				t.Fatalf("expected %d, got %d", test.expectedCode, rec.Code)
@@ -355,21 +358,21 @@ func TestCreateCar(t *testing.T) {
 	}
 
 	tests := []struct {
-		testName            string
-		palyload            Palyload
-		expectedCode        int
+		testName        string
+		palyload        Palyload
+		expectedCode    int
 		expectedCarName string
 	}{
 		{
-			testName:            "Car created",
-			palyload:            Palyload{Name: "test", PriceCents: 1},
-			expectedCode:        http.StatusCreated,
+			testName:        "Car created",
+			palyload:        Palyload{Name: "test", PriceCents: 1},
+			expectedCode:    http.StatusCreated,
 			expectedCarName: "test",
 		},
 		{
-			testName:            "Car created with trimmed name",
-			palyload:            Palyload{Name: "   test   ", PriceCents: 1},
-			expectedCode:        http.StatusCreated,
+			testName:        "Car created with trimmed name",
+			palyload:        Palyload{Name: "   test   ", PriceCents: 1},
+			expectedCode:    http.StatusCreated,
 			expectedCarName: "test",
 		},
 		{
@@ -393,7 +396,7 @@ func TestCreateCar(t *testing.T) {
 				PriceCents: test.palyload.PriceCents,
 			}
 
-			rec := executeRequest(t, app, http.MethodPost, "/cars", payload)
+			rec := executeRequest(t, app, http.MethodPost, "/cars", tokenFor(t, auth.AdminRole), payload)
 
 			if rec.Code != test.expectedCode {
 				t.Fatalf("expected code %d, got %d", test.expectedCode, rec.Code)
@@ -432,31 +435,31 @@ func TestUpdateCar(t *testing.T) {
 	const unavailableCarName = "this name is taken"
 
 	tests := []struct {
-		testName            string
-		payload             Payload
-		hasValidId          bool
-		expectedCode        int
+		testName        string
+		payload         Payload
+		hasValidId      bool
+		expectedCode    int
 		expectedCarName string
 	}{
 		{
-			testName:            "success - full update",
-			payload:             Payload{Name: strPtr(updatedCarName), PriceCents: int64Ptr(10)},
-			hasValidId:          true,
-			expectedCode:        http.StatusOK,
+			testName:        "success - full update",
+			payload:         Payload{Name: strPtr(updatedCarName), PriceCents: int64Ptr(10)},
+			hasValidId:      true,
+			expectedCode:    http.StatusOK,
 			expectedCarName: updatedCarName,
 		},
 		{
-			testName:            "success - update name only",
-			payload:             Payload{Name: strPtr(updatedCarName)},
-			hasValidId:          true,
-			expectedCode:        http.StatusOK,
+			testName:        "success - update name only",
+			payload:         Payload{Name: strPtr(updatedCarName)},
+			hasValidId:      true,
+			expectedCode:    http.StatusOK,
 			expectedCarName: updatedCarName,
 		},
 		{
-			testName:            "success - name is trimmed",
-			payload:             Payload{Name: strPtr(" " + updatedCarName + " ")},
-			hasValidId:          true,
-			expectedCode:        http.StatusOK,
+			testName:        "success - name is trimmed",
+			payload:         Payload{Name: strPtr(" " + updatedCarName + " ")},
+			hasValidId:      true,
+			expectedCode:    http.StatusOK,
 			expectedCarName: updatedCarName,
 		},
 		{
@@ -514,7 +517,7 @@ func TestUpdateCar(t *testing.T) {
 				path = fmt.Sprintf("/cars/%d", currentCar.ID+anotherCar.ID)
 			}
 
-			rec := executeRequest(t, app, http.MethodPatch, path, test.payload)
+			rec := executeRequest(t, app, http.MethodPatch, path, tokenFor(t, auth.AdminRole), test.payload)
 
 			if rec.Code != test.expectedCode {
 				t.Fatalf("expected code %d, got %d", test.expectedCode, rec.Code)
@@ -588,7 +591,7 @@ func TestDeleteCar(t *testing.T) {
 				path = fmt.Sprintf("/cars/%d", car.ID+1)
 			}
 
-			rec := executeRequest(t, app, http.MethodDelete, path, nil)
+			rec := executeRequest(t, app, http.MethodDelete, path, tokenFor(t, auth.AdminRole), nil)
 
 			if rec.Code != test.expectedCode {
 				t.Fatalf("expected code %d, got %d", test.expectedCode, rec.Code)
@@ -600,5 +603,69 @@ func TestDeleteCar(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCarRoutes_Authorization(t *testing.T) {
+	otherKey := newTestKey(t)
+	exp := time.Now().Add(time.Hour)
+
+	hs256Token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, auth.Claims{
+		UserID:           1,
+		Role:             auth.AdminRole,
+		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(exp)},
+	}).SignedString([]byte("test-secret"))
+	if err != nil {
+		t.Fatalf("failed to sign HS256 token: %v", err)
+	}
+
+	tokens := []struct {
+		name         string
+		token        string
+		expectedCode int
+	}{
+		{"no token", "", http.StatusUnauthorized},
+		{"expired token", signToken(t, trustedKey, auth.AdminRole, time.Now().Add(-time.Hour)), http.StatusUnauthorized},
+		{"token signed by another key", signToken(t, otherKey, auth.AdminRole, exp), http.StatusUnauthorized},
+		{"HS256 token", hs256Token, http.StatusUnauthorized},
+		{"customer token", tokenFor(t, auth.CustomerRole), http.StatusForbidden},
+		{"token with empty role", signToken(t, trustedKey, "", exp), http.StatusForbidden},
+	}
+
+	routes := []struct {
+		name   string
+		method string
+		path   func(carID uint) string
+		body   any
+	}{
+		{"create car", http.MethodPost, func(uint) string { return "/cars" }, map[string]any{"name": "new car", "price_cents": 1}},
+		{"update car", http.MethodPatch, func(id uint) string { return fmt.Sprintf("/cars/%d", id) }, map[string]any{"name": "hacked", "price_cents": 1}},
+		{"delete car", http.MethodDelete, func(id uint) string { return fmt.Sprintf("/cars/%d", id) }, nil},
+	}
+
+	for _, route := range routes {
+		for _, tok := range tokens {
+			t.Run(route.name+" - "+tok.name, func(t *testing.T) {
+				app, db := setupTestApp(t)
+				original := domain.Car{Name: "original", PriceCents: 5}
+				if err := db.Create(&original).Error; err != nil {
+					t.Fatal(err)
+				}
+
+				rec := executeRequest(t, app, route.method, route.path(original.ID), tok.token, route.body)
+
+				if rec.Code != tok.expectedCode {
+					t.Fatalf("expected code %d, got %d", tok.expectedCode, rec.Code)
+				}
+
+				var cars []domain.Car
+				if err := db.Find(&cars).Error; err != nil {
+					t.Fatal(err)
+				}
+				if len(cars) != 1 || cars[0].Name != original.Name || cars[0].PriceCents != original.PriceCents {
+					t.Fatalf("rejected request changed the data: %+v", cars)
+				}
+			})
+		}
 	}
 }

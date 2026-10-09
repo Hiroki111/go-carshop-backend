@@ -22,6 +22,18 @@
 
 ## Local development
 
+To get started, you need to generate a private & public key pari from `user-service`. Run the following at the root of `user-service` folder:
+```
+mkdir -p keys
+openssl genrsa -out keys/private.pem 2048
+openssl rsa -in keys/private.pem -pubout -out keys/public.pem
+```
+
+This will generate `keys/private.pem` and `keys/public.pem` in `user-service`.
+
+Then, copy-paste `keys/public.pem` to services that need to parse access tokens (JWT). For example, `car-service` needs a public key, so there needs to be `car-service/keys/public.pem`.
+
+
 Start PostgreSQL and Redis from the repository root:
 
 ```bash
@@ -108,16 +120,3 @@ Every time you change your annotations or DTOs, you need to regenerate the docs.
 ```
 swag init -g cmd/web/main.go
 ```
-
-### How to start user-service
-
-1. Generate the RSA keypair. Run the following at the root of this `user-service` folder:
-```
-mkdir -p keys
-openssl genrsa -out keys/private.pem 2048
-openssl rsa -in keys/private.pem -pubout -out keys/public.pem
-```
-
-2. Create user-service/.env from .env.example, and set a real ADMIN_PASSWORD.
-
-3. Run `go run ./cmd/web/`.

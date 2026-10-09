@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Hiroki111/go-carshop-backend/car-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/cache"
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/handler"
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/metrics"
@@ -49,6 +50,15 @@ func main() {
 	// NOTE: Ignore error; variables might be injected by Docker/K8s
 	_ = godotenv.Load()
 
+	publicKeyPath := os.Getenv("PUBLIC_KEY_PATH")
+	if publicKeyPath == "" {
+		log.Fatal("PUBLIC_KEY_PATH not set")
+	}
+	publicKey, err := auth.LoadPublicKey(publicKeyPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	metrics.Register()
 
 	db, err := newPostgresDB()
@@ -74,7 +84,7 @@ func main() {
 	carsCacheWarmer.WarmCarList(initialCarListCacheTTL)
 
 	service := service.NewService(repo, carsCache, carsCacheWarmer)
-	h := handler.NewHandler(service)
+	h := handler.NewHandler(service, publicKey)
 
 	server := &http.Server{
 		Addr:    portNumber,

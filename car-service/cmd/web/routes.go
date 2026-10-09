@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/Hiroki111/go-carshop-backend/car-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/handler"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -20,9 +21,9 @@ func routes(handler *handler.Handler) http.Handler {
 
 		r.Get("/cars", handler.GetCars)
 		r.Get("/cars/{id}", handler.GetCarById)
-		r.Post("/cars", handler.CreateCar)
-		r.Patch("/cars/{id}", handler.UpdateCar)
-		r.Delete("/cars/{id}", handler.DeleteCar)
+		r.Post("/cars", handler.RequireRole(auth.AdminRole, handler.CreateCar))
+		r.Patch("/cars/{id}", handler.RequireRole(auth.AdminRole, handler.UpdateCar))
+		r.Delete("/cars/{id}", handler.RequireRole(auth.AdminRole, handler.DeleteCar))
 	})
 
 	// public

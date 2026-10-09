@@ -174,6 +174,7 @@ func (h *Handler) GetCarById(w http.ResponseWriter, r *http.Request) {
 // @Success      201      {object}  CreateCarResponse
 // @Failure      400      {object}  ErrorResponse
 // @Failure      401      {object}  ErrorResponse
+// @Failure      403      {object}  ErrorResponse
 // @Failure      409      {object}  ErrorResponse
 // @Failure      500      {object}  ErrorResponse
 // @Router       /cars [post]
@@ -235,6 +236,7 @@ func (h *Handler) CreateCar(w http.ResponseWriter, r *http.Request) {
 // @Success      200      {object}  UpdateCarResponse
 // @Failure      400      {object}  ErrorResponse
 // @Failure      401      {object}  ErrorResponse
+// @Failure      403      {object}  ErrorResponse
 // @Failure      404      {object}  ErrorResponse
 // @Failure      409      {object}  ErrorResponse
 // @Failure      500      {object}  ErrorResponse

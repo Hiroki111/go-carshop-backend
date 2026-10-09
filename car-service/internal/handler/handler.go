@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -11,11 +12,12 @@ import (
 )
 
 type Handler struct {
-	service  *service.Service
-	validate *validator.Validate
+	service   *service.Service
+	validate  *validator.Validate
+	publicKey *rsa.PublicKey
 }
 
-func NewHandler(service *service.Service) *Handler {
+func NewHandler(service *service.Service, publicKey *rsa.PublicKey) *Handler {
 	v := validator.New()
 
 	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
@@ -27,8 +29,9 @@ func NewHandler(service *service.Service) *Handler {
 	})
 
 	return &Handler{
-		service:  service,
-		validate: v,
+		service:   service,
+		validate:  v,
+		publicKey: publicKey,
 	}
 }
 

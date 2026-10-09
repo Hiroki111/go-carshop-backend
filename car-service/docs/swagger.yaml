@@ -4,6 +4,8 @@ definitions:
     properties:
       id:
         type: integer
+      is_available:
+        type: boolean
       name:
         type: string
       price_cents:
@@ -160,6 +162,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -235,6 +241,10 @@ paths:
             $ref: '#/definitions/handler.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "404":
