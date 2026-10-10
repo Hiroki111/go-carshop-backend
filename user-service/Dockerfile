@@ -6,14 +6,14 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /out/order-service ./cmd/web
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/user-service ./cmd/web
 
 # ---- Run stage ----
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates && \
     addgroup -S app && adduser -S app -G app
 WORKDIR /app
-COPY --from=builder /out/order-service .
+COPY --from=builder /out/user-service .
 USER app
-EXPOSE 8081
-ENTRYPOINT ["./order-service"]
+EXPOSE 8082
+ENTRYPOINT ["./user-service"]

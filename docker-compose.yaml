@@ -13,10 +13,54 @@ services:
     environment:
       - DB_HOST=car-service-db
       - REDIS_HOST=redis
+      - PUBLIC_KEY_PATH=/app/keys/public.pem
+    volumes:
+      - ./car-service/keys/public.pem:/app/keys/public.pem:ro
     depends_on:
       car-service-db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+
+  order-service:
+    container_name: order-service
+    build:
+      context: ./order-service
+    env_file:
+      - ./order-service/.env
+    image: order-service:local
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_HOST=order-service-db
+      - DB_PORT=5432
+      - CAR_SERVICE_URL=http://car-service:8080
+      - PUBLIC_KEY_PATH=/app/keys/public.pem
+    volumes:
+      - ./order-service/keys/public.pem:/app/keys/public.pem:ro
+    depends_on:
+      order-service-db:
+        condition: service_healthy
+      car-service:
+        condition: service_started
+
+  user-service:
+    container_name: user-service
+    build:
+      context: ./user-service
+    env_file:
+      - ./user-service/.env
+    image: user-service:local
+    ports:
+      - "8082:8082"
+    environment:
+      - DB_HOST=user-service-db
+      - DB_PORT=5432
+      - PRIVATE_KEY_PATH=/app/keys/private.pem
+    volumes:
+      - ./user-service/keys/private.pem:/app/keys/private.pem:ro
+    depends_on:
+      user-service-db:
         condition: service_healthy
 
   car-service-db:

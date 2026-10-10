@@ -22,25 +22,40 @@
 
 ## Local development
 
-To get started, you need to generate a private & public key pari from `user-service`. Run the following at the root of `user-service` folder:
-```
+### Keys for access tokens
+
+user-service signs access tokens (JWTs) with a private key. The other services verify those tokens with the matching public key, so they never need the private key.
+
+Generate the key pair from the root of the `user-service` folder:
+```bash
 mkdir -p keys
 openssl genrsa -out keys/private.pem 2048
 openssl rsa -in keys/private.pem -pubout -out keys/public.pem
 ```
 
-This will generate `keys/private.pem` and `keys/public.pem` in `user-service`.
-
-Then, copy-paste `keys/public.pem` to services that need to parse access tokens (JWT). For example, `car-service` needs a public key, so there needs to be `car-service/keys/public.pem`.
-
-
-Start PostgreSQL and Redis from the repository root:
-
+Then copy the public key into every service that verifies access tokens. From the repository root:
 ```bash
-docker compose up -d
+mkdir -p car-service/keys order-service/keys
+cp user-service/keys/public.pem car-service/keys/public.pem
+cp user-service/keys/public.pem order-service/keys/public.pem
 ```
 
-Check that both containers are healthy:
+You should end up with:
+- `user-service/keys/private.pem` and `user-service/keys/public.pem`
+- `car-service/keys/public.pem`
+- `order-service/keys/public.pem`
+
+The `keys/` folders are gitignored. Docker Compose mounts these files into the containers, so they are not baked into any image. If you regenerate the key pair, copy the new `public.pem` again and restart the services; tokens signed with the old key stop being valid.
+
+### Running a service locally
+
+Start the databases and Redis from the repository root:
+
+```bash
+docker compose up -d car-service-db order-service-db user-service-db redis
+```
+
+Check that the containers are healthy:
 
 ```bash
 docker compose ps
@@ -54,9 +69,9 @@ cp .env.example .env # only needed if .env does not already exist
 go run ./cmd/web
 ```
 
-Populate `cars` table by running this:
+Populate `cars` table by running this from the `car-service` directory:
 ```bash
-docker exec -i <postgres-container-name> psql -U car_service_user -d car_service < migrations/seed.sql
+docker exec -i car-service-db psql -U car_service_user -d car_service < migrations/seed.sql
 ```
 
 The service uses PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.
@@ -73,18 +88,31 @@ Make sure the following ones are installed:
 
 Create `.env` for each service by following `.env.example`.
 
-To run a service locally for development purposes, run:
-```bash
-docker compose up postgres redis prometheus grafana -d
-cd <service-folder-name>
-go run ./cmd/web/
-```
-This will run the service and infra services separately.
+There are two ways to run the services. Either way, the databases are reachable from your machine on `localhost:5432` (car-service), `localhost:5433` (order-service) and `localhost:5434` (user-service).
 
-To build the app's image and run it with the infra services by Docker Compose, run:
+**Everything in Docker** (for example, to try the endpoints with Postman):
 ```bash
 docker compose up --build -d
 ```
+car-service is then at http://localhost:8080, order-service at http://localhost:8081 and user-service at http://localhost:8082.
+
+**One service on your machine, the rest in Docker** (for example, to debug it or to iterate quickly): start everything, stop the container of the service you are working on, and run that service from its folder:
+```bash
+docker compose up --build -d
+docker compose stop car-service   # the container would otherwise hold port 8080
+cd car-service
+go run ./cmd/web/
+```
+When you are done, `docker compose start car-service` brings the container back.
+
+The `.env` files copied from `.env.example` use `localhost` and the host-side database ports, which is what a locally-run service needs. Inside Docker, `docker-compose.yaml` overrides them (`DB_HOST`, `DB_PORT`, `CAR_SERVICE_URL`, and the key paths) so the containers reach each other by service name.
+
+To run *all* services on your machine instead, start only the infra:
+```bash
+docker compose up -d car-service-db order-service-db user-service-db redis prometheus grafana
+```
+
+Note that Prometheus scrapes `car-service:8080` inside the Docker network, so its target shows as DOWN while car-service runs on your machine instead of in a container.
 
 (Use `docker compose stop` for stopping containers, `docker compose start` for starting them again, and `docker compose down` for removing them. To remove containers and remove persistent volume, run `docker compose down -v`.)
 
