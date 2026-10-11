@@ -23,6 +23,13 @@ func parseOptionalInt64(value string, defaultValue int64) (int64, error) {
 	return strconv.ParseInt(value, 10, 64)
 }
 
+func parseOptionalBool(value string, defaultValue bool) (bool, error) {
+	if value == "" {
+		return defaultValue, nil
+	}
+	return strconv.ParseBool(value)
+}
+
 func parseOptionalInt(value string, defaultValue int) (int, error) {
 	if value == "" {
 		return defaultValue, nil

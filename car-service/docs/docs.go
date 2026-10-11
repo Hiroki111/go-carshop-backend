@@ -26,7 +26,7 @@ const docTemplate = `{
     "paths": {
         "/cars": {
             "get": {
-                "description": "Returns a paginated list of cars with optional filtering and sorting.",
+                "description": "Returns a paginated list of cars with optional filtering and sorting. Only available cars are listed unless include_unavailable_cars is true.",
                 "consumes": [
                     "application/json"
                 ],
@@ -66,6 +66,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "maximum price in cents",
                         "name": "maxPrice",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "also list cars that are not available (reserved, sold, withdrawn); defaults to false",
+                        "name": "include_unavailable_cars",
                         "in": "query"
                     },
                     {
@@ -307,7 +313,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Withdraws a car from sale (any status except sold) or relists a withdrawn car as available (Admin only). Reserving, releasing and selling a car are not done here.",
+                "description": "Withdraws an available car from sale, or relists a withdrawn car as available (Admin only). A reserved car has to be released first, and reserving, releasing and selling a car are not done here.",
                 "consumes": [
                     "application/json"
                 ],

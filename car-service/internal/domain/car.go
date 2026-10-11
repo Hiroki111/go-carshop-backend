@@ -20,7 +20,7 @@ const (
 
 var allowedTransitions = map[CarStatus][]CarStatus{
 	CarStatusAvailable: {CarStatusReserved, CarStatusWithdrawn},
-	CarStatusReserved:  {CarStatusAvailable, CarStatusSold, CarStatusWithdrawn},
+	CarStatusReserved:  {CarStatusAvailable, CarStatusSold},
 	CarStatusWithdrawn: {CarStatusAvailable},
 	CarStatusSold:      {},
 }

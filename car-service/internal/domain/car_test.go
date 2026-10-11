@@ -7,7 +7,7 @@ func TestCarStatus_CanTransitionTo(t *testing.T) {
 
 	allowed := map[CarStatus]map[CarStatus]bool{
 		CarStatusAvailable: {CarStatusReserved: true, CarStatusWithdrawn: true},
-		CarStatusReserved:  {CarStatusAvailable: true, CarStatusSold: true, CarStatusWithdrawn: true},
+		CarStatusReserved:  {CarStatusAvailable: true, CarStatusSold: true},
 		CarStatusWithdrawn: {CarStatusAvailable: true},
 		CarStatusSold:      {},
 	}
@@ -55,14 +55,15 @@ func TestCarStatus_CanBeChangedByDealerTo(t *testing.T) {
 		from, to CarStatus
 		want     bool
 	}{
-		// A dealer can withdraw anything that is not sold ...
+		// A dealer can withdraw an available car ...
 		{CarStatusAvailable, CarStatusWithdrawn, true},
-		{CarStatusReserved, CarStatusWithdrawn, true},
 		// ... and relist a withdrawn car.
 		{CarStatusWithdrawn, CarStatusAvailable, true},
 		// Sold cars' statuses can't be changed.
 		{CarStatusSold, CarStatusWithdrawn, false},
 		{CarStatusSold, CarStatusAvailable, false},
+		// A reserved car has an order in flight; it must be released first.
+		{CarStatusReserved, CarStatusWithdrawn, false},
 		// Not changing status is invalid.
 		{CarStatusAvailable, CarStatusAvailable, false},
 		{CarStatusWithdrawn, CarStatusWithdrawn, false},

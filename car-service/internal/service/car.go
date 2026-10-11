@@ -18,13 +18,14 @@ const (
 )
 
 type GetCarsParameters struct {
-	OrderBy  string
-	SortIn   string
-	Name     string
-	MinPrice int64
-	MaxPrice int64
-	Page     int
-	Limit    int
+	OrderBy                string
+	SortIn                 string
+	Name                   string
+	MinPrice               int64
+	MaxPrice               int64
+	IncludeUnavailableCars bool
+	Page                   int
+	Limit                  int
 }
 
 func (s *Service) GetCarsWithTotalCount(ctx context.Context, params GetCarsParameters) ([]domain.Car, uint, error) {
@@ -40,6 +41,8 @@ func (s *Service) GetCarsWithTotalCount(ctx context.Context, params GetCarsParam
 		MaxPrice: params.MaxPrice,
 		Limit:    params.Limit,
 		Offset:   offset,
+
+		IncludeUnavailableCars: params.IncludeUnavailableCars,
 	}
 
 	ttl := getTTLForQuery(inputs)
@@ -58,8 +61,8 @@ func (s *Service) GetCarsWithTotalCount(ctx context.Context, params GetCarsParam
 	}
 
 	newCarPage := cache.CarsPage{
-		Cars: cars,
-		Total:    total,
+		Cars:  cars,
+		Total: total,
 	}
 	if err := s.carsCache.SetPage(ctx, cacheKey, &newCarPage, ttl); err != nil {
 		log.Printf("failed to set cars cache: %v", err)

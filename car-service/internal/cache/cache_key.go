@@ -12,12 +12,13 @@ func CarCacheKey(id uint) string {
 
 func CarListCacheKey(inputs repository.GetCarsInput) string {
 	return fmt.Sprintf(
-		"cars:o=%s:s=%s:n=%s:min=%d:max=%d:off=%d:lim=%d",
+		"cars:o=%s:s=%s:n=%s:min=%d:max=%d:unavail=%t:off=%d:lim=%d",
 		inputs.OrderBy,
 		inputs.SortIn,
 		inputs.Name,
 		inputs.MinPrice,
 		inputs.MaxPrice,
+		inputs.IncludeUnavailableCars,
 		inputs.Offset,
 		inputs.Limit,
 	)

@@ -12,13 +12,14 @@ import (
 )
 
 type GetCarsInput struct {
-	OrderBy  string
-	SortIn   string
-	Name     string
-	MinPrice int64
-	MaxPrice int64
-	Offset   int
-	Limit    int
+	OrderBy                string
+	SortIn                 string
+	Name                   string
+	MinPrice               int64
+	MaxPrice               int64
+	IncludeUnavailableCars bool
+	Offset                 int
+	Limit                  int
 }
 
 type UpdateCarsInput struct {
@@ -44,6 +45,10 @@ func (r *Repository) GetCarsWithTotalCount(inputs GetCarsInput) ([]domain.Car, i
 	query = query.
 		Where("price_cents >= ?", inputs.MinPrice).
 		Where("price_cents <= ?", inputs.MaxPrice)
+
+	if !inputs.IncludeUnavailableCars {
+		query = query.Where("status = ?", string(domain.CarStatusAvailable))
+	}
 
 	sortIn := "asc"
 	if inputs.SortIn == "desc" {

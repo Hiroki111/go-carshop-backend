@@ -111,6 +111,7 @@ paths:
       consumes:
       - application/json
       description: Returns a paginated list of cars with optional filtering and sorting.
+        Only available cars are listed unless include_unavailable_cars is true.
       parameters:
       - description: field to sort by (name, price_cents)
         in: query
@@ -132,6 +133,11 @@ paths:
         in: query
         name: maxPrice
         type: integer
+      - description: also list cars that are not available (reserved, sold, withdrawn);
+          defaults to false
+        in: query
+        name: include_unavailable_cars
+        type: boolean
       - description: page number
         in: query
         name: page
@@ -290,9 +296,9 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Withdraws a car from sale (any status except sold) or relists a
-        withdrawn car as available (Admin only). Reserving, releasing and selling
-        a car are not done here.
+      description: Withdraws an available car from sale, or relists a withdrawn car
+        as available (Admin only). A reserved car has to be released first, and reserving,
+        releasing and selling a car are not done here.
       parameters:
       - description: Car ID
         in: path

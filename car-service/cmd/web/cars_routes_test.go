@@ -188,6 +188,64 @@ func TestGetCars_WithFilteringByPrice(t *testing.T) {
 	}
 }
 
+func TestGetCars_WithStatusFilter(t *testing.T) {
+	cars := []domain.Car{
+		{Name: "available car", Status: domain.CarStatusAvailable},
+		{Name: "reserved car", Status: domain.CarStatusReserved},
+		{Name: "sold car", Status: domain.CarStatusSold},
+		{Name: "withdrawn car", Status: domain.CarStatusWithdrawn},
+	}
+
+	tests := []struct {
+		name             string
+		query            string
+		expectedCode     int
+		expectedCarNames []string
+	}{
+		{name: "only available cars by default", query: "", expectedCode: http.StatusOK, expectedCarNames: []string{"available car"}},
+		{name: "include_unavailable_cars=false", query: "?include_unavailable_cars=false", expectedCode: http.StatusOK, expectedCarNames: []string{"available car"}},
+		{name: "include_unavailable_cars=true", query: "?include_unavailable_cars=true", expectedCode: http.StatusOK, expectedCarNames: []string{"available car", "reserved car", "sold car", "withdrawn car"}},
+		{name: "unavailable cars are hidden from other filters too", query: "?name=sold", expectedCode: http.StatusOK, expectedCarNames: []string{}},
+		{name: "unavailable cars can be found with other filters", query: "?name=sold&include_unavailable_cars=true", expectedCode: http.StatusOK, expectedCarNames: []string{"sold car"}},
+		{name: "invalid value", query: "?include_unavailable_cars=maybe", expectedCode: http.StatusBadRequest},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			app, db := setupTestApp(t)
+			seedCars(t, db, cars)
+
+			rec := executeRequest(t, app, http.MethodGet, "/cars"+test.query, "", nil)
+
+			if rec.Code != test.expectedCode {
+				t.Fatalf("expected %d, got %d", test.expectedCode, rec.Code)
+			}
+			if test.expectedCode != http.StatusOK {
+				return
+			}
+
+			var resp handler.GetCarsResponse
+			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+				t.Fatalf("invalid json response")
+			}
+
+			actualNames := make([]string, 0, len(resp.Items))
+			for _, item := range resp.Items {
+				actualNames = append(actualNames, item.Name)
+			}
+			sort.Strings(actualNames)
+			sort.Strings(test.expectedCarNames)
+
+			if !reflect.DeepEqual(actualNames, test.expectedCarNames) {
+				t.Fatalf("expected cars %v, got %v", test.expectedCarNames, actualNames)
+			}
+			if resp.Total != len(test.expectedCarNames) {
+				t.Fatalf("expected total %d, got %d", len(test.expectedCarNames), resp.Total)
+			}
+		})
+	}
+}
+
 func TestGetCars_WithPagination(t *testing.T) {
 	cars := make([]domain.Car, 100)
 	for i := range cars {
@@ -583,12 +641,13 @@ func TestUpdateCarStatus(t *testing.T) {
 		expectedCode   int
 		expectedStatus domain.CarStatus // the seeded car's status afterwards
 	}{
-		// A dealer can withdraw any car that is not sold ...
+		// A dealer can withdraw an available car ...
 		{testName: "available -> withdrawn", from: domain.CarStatusAvailable, body: withdrawn, expectedCode: http.StatusOK, expectedStatus: domain.CarStatusWithdrawn},
-		{testName: "reserved -> withdrawn", from: domain.CarStatusReserved, body: withdrawn, expectedCode: http.StatusOK, expectedStatus: domain.CarStatusWithdrawn},
 		// ... and relist a withdrawn one.
 		{testName: "withdrawn -> available", from: domain.CarStatusWithdrawn, body: available, expectedCode: http.StatusOK, expectedStatus: domain.CarStatusAvailable},
 
+		// A reserved car has an order in flight; it must be released first.
+		{testName: "fail - reserved -> withdrawn", from: domain.CarStatusReserved, body: withdrawn, expectedCode: http.StatusConflict, expectedStatus: domain.CarStatusReserved},
 		// A sold car is final.
 		{testName: "fail - sold -> withdrawn", from: domain.CarStatusSold, body: withdrawn, expectedCode: http.StatusConflict, expectedStatus: domain.CarStatusSold},
 		{testName: "fail - sold -> available", from: domain.CarStatusSold, body: available, expectedCode: http.StatusConflict, expectedStatus: domain.CarStatusSold},

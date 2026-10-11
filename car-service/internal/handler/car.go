@@ -15,7 +15,7 @@ import (
 
 // GetCars godoc
 // @Summary      List cars
-// @Description  Returns a paginated list of cars with optional filtering and sorting.
+// @Description  Returns a paginated list of cars with optional filtering and sorting. Only available cars are listed unless include_unavailable_cars is true.
 // @Tags         cars
 // @Accept       json
 // @Produce      json
@@ -24,6 +24,7 @@ import (
 // @Param        name     query  string false "filter by car name (partial match)"
 // @Param        minPrice query  int    false "minimum price in cents"
 // @Param        maxPrice query  int    false "maximum price in cents"
+// @Param        include_unavailable_cars query bool false "also list cars that are not available (reserved, sold, withdrawn); defaults to false"
 // @Param        page     query  int    false "page number"
 // @Param        limit    query  int    false "items per page"
 // @Success      200      {object}  GetCarsResponse
@@ -36,6 +37,7 @@ func (h *Handler) GetCars(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
 	minPrice := r.URL.Query().Get("minPrice")
 	maxPrice := r.URL.Query().Get("maxPrice")
+	includeUnavailableCars := r.URL.Query().Get("include_unavailable_cars")
 	page := r.URL.Query().Get("page")
 	limit := r.URL.Query().Get("limit")
 
@@ -51,6 +53,14 @@ func (h *Handler) GetCars(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error: "invalid maxPrice",
+		})
+		return
+	}
+
+	includeUnavailableCarsBool, err := parseOptionalBool(includeUnavailableCars, false)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error: "include_unavailable_cars must be true or false",
 		})
 		return
 	}
@@ -80,6 +90,8 @@ func (h *Handler) GetCars(w http.ResponseWriter, r *http.Request) {
 		MaxPrice: maxPriceInt,
 		Page:     pageInt,
 		Limit:    limitInt,
+
+		IncludeUnavailableCars: includeUnavailableCarsBool,
 	}
 	cars, total, err := h.service.GetCarsWithTotalCount(ctx, params)
 	if err != nil {
@@ -318,7 +330,7 @@ func (h *Handler) UpdateCar(w http.ResponseWriter, r *http.Request) {
 
 // UpdateCarStatus godoc
 // @Summary      Withdraw or relist a car
-// @Description  Withdraws a car from sale (any status except sold) or relists a withdrawn car as available (Admin only). Reserving, releasing and selling a car are not done here.
+// @Description  Withdraws an available car from sale, or relists a withdrawn car as available (Admin only). A reserved car has to be released first, and reserving, releasing and selling a car are not done here.
 // @Tags         cars
 // @Accept       json
 // @Produce      json
