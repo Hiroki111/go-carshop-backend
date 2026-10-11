@@ -299,6 +299,88 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/cars/{id}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Withdraws a car from sale (any status except sold) or relists a withdrawn car as available (Admin only). Reserving, releasing and selling a car are not done here.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "cars"
+                ],
+                "summary": "Withdraw or relist a car",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Car ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New status",
+                        "name": "status",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateCarStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateCarStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -308,14 +390,21 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
-                "is_available": {
-                    "type": "boolean"
-                },
                 "name": {
                     "type": "string"
                 },
                 "price_cents": {
                     "type": "integer"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "available",
+                        "reserved",
+                        "sold",
+                        "withdrawn"
+                    ],
+                    "example": "available"
                 }
             }
         },
@@ -400,6 +489,30 @@ const docTemplate = `{
             }
         },
         "handler.UpdateCarResponse": {
+            "type": "object",
+            "properties": {
+                "item": {
+                    "$ref": "#/definitions/handler.CarItem"
+                }
+            }
+        },
+        "handler.UpdateCarStatusRequest": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "available",
+                        "withdrawn"
+                    ],
+                    "example": "withdrawn"
+                }
+            }
+        },
+        "handler.UpdateCarStatusResponse": {
             "type": "object",
             "properties": {
                 "item": {

@@ -23,10 +23,10 @@ func NewHTTPCarClient(baseURL string) *HTTPCarClient {
 }
 
 type carItem struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
-	PriceCents  uint   `json:"price_cents"`
-	IsAvailable bool   `json:"is_available"`
+	ID         uint   `json:"id"`
+	Name       string `json:"name"`
+	PriceCents uint   `json:"price_cents"`
+	Status     string `json:"status"`
 }
 
 type getCarResponse struct {
@@ -61,9 +61,9 @@ func (c *HTTPCarClient) GetCarByID(ctx context.Context, id uint) (Car, error) {
 	}
 
 	return Car{
-		ID:          body.Item.ID,
-		Name:        body.Item.Name,
-		PriceCents:  body.Item.PriceCents,
-		IsAvailable: body.Item.IsAvailable,
+		ID:         body.Item.ID,
+		Name:       body.Item.Name,
+		PriceCents: body.Item.PriceCents,
+		Status:     body.Item.Status,
 	}, nil
 }

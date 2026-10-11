@@ -41,6 +41,8 @@ func (h *Handler) formatValidationError(err error) string {
 				errorMessages = append(errorMessages, fmt.Sprintf("field '%s' must be at least %s characters long", validationError.Field(), validationError.Param()))
 			case "max":
 				errorMessages = append(errorMessages, fmt.Sprintf("field '%s' cannot exceed %s characters", validationError.Field(), validationError.Param()))
+			case "oneof":
+				errorMessages = append(errorMessages, fmt.Sprintf("field '%s' must be one of: %s", validationError.Field(), validationError.Param()))
 			case "gt":
 				errorMessages = append(errorMessages, fmt.Sprintf("field '%s' must be greater than %s", validationError.Field(), validationError.Param()))
 			}

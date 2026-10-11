@@ -346,6 +346,10 @@ func TestGetCar_ById(t *testing.T) {
 				if resp.Item.Name != "test" {
 					t.Fatalf("expected name 'test', got %s", resp.Item.Name)
 				}
+
+				if resp.Item.Status != string(domain.CarStatusAvailable) {
+					t.Fatalf("expected status %q, got %q", domain.CarStatusAvailable, resp.Item.Status)
+				}
 			}
 		})
 	}
@@ -419,6 +423,13 @@ func TestCreateCar(t *testing.T) {
 
 				if createdCar.Name != test.expectedCarName {
 					t.Fatalf("expected name in DB %s, got %s", test.expectedCarName, createdCar.Name)
+				}
+
+				if resp.Item.Status != string(domain.CarStatusAvailable) {
+					t.Fatalf("expected a new car to be available in the response, got %q", resp.Item.Status)
+				}
+				if createdCar.Status != domain.CarStatusAvailable {
+					t.Fatalf("expected a new car to be available in the DB, got %q", createdCar.Status)
 				}
 			}
 		})
@@ -559,6 +570,105 @@ func TestUpdateCar(t *testing.T) {
 	}
 }
 
+func TestUpdateCarStatus(t *testing.T) {
+	withdrawn := map[string]any{"status": "withdrawn"}
+	available := map[string]any{"status": "available"}
+
+	tests := []struct {
+		testName       string
+		from           domain.CarStatus
+		body           any
+		carIDOffset    uint   // added to the seeded car's ID; non-zero asks for a car that does not exist
+		pathOverride   string // used instead of the car's path when set
+		expectedCode   int
+		expectedStatus domain.CarStatus // the seeded car's status afterwards
+	}{
+		// A dealer can withdraw any car that is not sold ...
+		{testName: "available -> withdrawn", from: domain.CarStatusAvailable, body: withdrawn, expectedCode: http.StatusOK, expectedStatus: domain.CarStatusWithdrawn},
+		{testName: "reserved -> withdrawn", from: domain.CarStatusReserved, body: withdrawn, expectedCode: http.StatusOK, expectedStatus: domain.CarStatusWithdrawn},
+		// ... and relist a withdrawn one.
+		{testName: "withdrawn -> available", from: domain.CarStatusWithdrawn, body: available, expectedCode: http.StatusOK, expectedStatus: domain.CarStatusAvailable},
+
+		// A sold car is final.
+		{testName: "fail - sold -> withdrawn", from: domain.CarStatusSold, body: withdrawn, expectedCode: http.StatusConflict, expectedStatus: domain.CarStatusSold},
+		{testName: "fail - sold -> available", from: domain.CarStatusSold, body: available, expectedCode: http.StatusConflict, expectedStatus: domain.CarStatusSold},
+		// Staying in the same status is not a change.
+		{testName: "fail - withdrawn -> withdrawn", from: domain.CarStatusWithdrawn, body: withdrawn, expectedCode: http.StatusConflict, expectedStatus: domain.CarStatusWithdrawn},
+		{testName: "fail - available -> available", from: domain.CarStatusAvailable, body: available, expectedCode: http.StatusConflict, expectedStatus: domain.CarStatusAvailable},
+		// Releasing a reservation belongs to the order flow, not to a dealer.
+		{testName: "fail - reserved -> available", from: domain.CarStatusReserved, body: available, expectedCode: http.StatusConflict, expectedStatus: domain.CarStatusReserved},
+
+		// Reserved and sold cannot be requested through this endpoint at all.
+		{testName: "fail - target reserved", from: domain.CarStatusAvailable, body: map[string]any{"status": "reserved"}, expectedCode: http.StatusBadRequest, expectedStatus: domain.CarStatusAvailable},
+		{testName: "fail - target sold", from: domain.CarStatusReserved, body: map[string]any{"status": "sold"}, expectedCode: http.StatusBadRequest, expectedStatus: domain.CarStatusReserved},
+		{testName: "fail - unknown status", from: domain.CarStatusAvailable, body: map[string]any{"status": "banana"}, expectedCode: http.StatusBadRequest, expectedStatus: domain.CarStatusAvailable},
+		{testName: "fail - missing status", from: domain.CarStatusAvailable, body: map[string]any{}, expectedCode: http.StatusBadRequest, expectedStatus: domain.CarStatusAvailable},
+		{testName: "fail - malformed body", from: domain.CarStatusAvailable, body: "not an object", expectedCode: http.StatusBadRequest, expectedStatus: domain.CarStatusAvailable},
+
+		{testName: "fail - car not found", from: domain.CarStatusAvailable, body: withdrawn, carIDOffset: 1000, expectedCode: http.StatusNotFound, expectedStatus: domain.CarStatusAvailable},
+		{testName: "fail - invalid ID", from: domain.CarStatusAvailable, body: withdrawn, pathOverride: "/cars/abc/status", expectedCode: http.StatusBadRequest, expectedStatus: domain.CarStatusAvailable},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			app, db := setupTestApp(t)
+
+			car := domain.Car{Name: "test", PriceCents: 5, Status: test.from}
+			if err := db.Create(&car).Error; err != nil {
+				t.Fatal(err)
+			}
+
+			path := fmt.Sprintf("/cars/%d/status", car.ID+test.carIDOffset)
+			if test.pathOverride != "" {
+				path = test.pathOverride
+			}
+
+			rec := executeRequest(t, app, http.MethodPatch, path, tokenFor(t, auth.AdminRole), test.body)
+
+			if rec.Code != test.expectedCode {
+				t.Fatalf("expected code %d, got %d (body: %s)", test.expectedCode, rec.Code, rec.Body.String())
+			}
+
+			var stored domain.Car
+			if err := db.First(&stored, car.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if stored.Status != test.expectedStatus {
+				t.Fatalf("expected status %q in DB, got %q", test.expectedStatus, stored.Status)
+			}
+
+			if test.expectedCode == http.StatusOK {
+				var resp handler.UpdateCarStatusResponse
+				if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+				if resp.Item.ID != car.ID || resp.Item.Status != string(test.expectedStatus) {
+					t.Fatalf("unexpected response item: %+v", resp.Item)
+				}
+				// Every successful change bumps the version (it starts at 1).
+				if stored.Version != 2 {
+					t.Fatalf("expected version 2 after the change, got %d", stored.Version)
+				}
+			} else if stored.Version != 1 {
+				t.Fatalf("a rejected change must not bump the version, got %d", stored.Version)
+			}
+		})
+	}
+}
+
+func TestCarStatus_DatabaseRejectsUnknownStatus(t *testing.T) {
+	_, db := setupTestApp(t)
+
+	car := domain.Car{Name: "test", PriceCents: 5}
+	if err := db.Create(&car).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Exec("UPDATE cars SET status = ? WHERE id = ?", "banana", car.ID).Error; err == nil {
+		t.Fatal("expected the database to reject an unknown status")
+	}
+}
+
 func TestDeleteCar(t *testing.T) {
 	tests := []struct {
 		testName     string
@@ -640,6 +750,7 @@ func TestCarRoutes_Authorization(t *testing.T) {
 	}{
 		{"create car", http.MethodPost, func(uint) string { return "/cars" }, map[string]any{"name": "new car", "price_cents": 1}},
 		{"update car", http.MethodPatch, func(id uint) string { return fmt.Sprintf("/cars/%d", id) }, map[string]any{"name": "hacked", "price_cents": 1}},
+		{"update car status", http.MethodPatch, func(id uint) string { return fmt.Sprintf("/cars/%d/status", id) }, map[string]any{"status": "withdrawn"}},
 		{"delete car", http.MethodDelete, func(id uint) string { return fmt.Sprintf("/cars/%d", id) }, nil},
 	}
 
@@ -647,7 +758,7 @@ func TestCarRoutes_Authorization(t *testing.T) {
 		for _, tok := range tokens {
 			t.Run(route.name+" - "+tok.name, func(t *testing.T) {
 				app, db := setupTestApp(t)
-				original := domain.Car{Name: "original", PriceCents: 5}
+				original := domain.Car{Name: "original", PriceCents: 5, Status: domain.CarStatusAvailable}
 				if err := db.Create(&original).Error; err != nil {
 					t.Fatal(err)
 				}
@@ -662,7 +773,7 @@ func TestCarRoutes_Authorization(t *testing.T) {
 				if err := db.Find(&cars).Error; err != nil {
 					t.Fatal(err)
 				}
-				if len(cars) != 1 || cars[0].Name != original.Name || cars[0].PriceCents != original.PriceCents {
+				if len(cars) != 1 || cars[0].Name != original.Name || cars[0].PriceCents != original.PriceCents || cars[0].Status != original.Status {
 					t.Fatalf("rejected request changed the data: %+v", cars)
 				}
 			})

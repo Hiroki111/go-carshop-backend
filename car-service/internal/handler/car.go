@@ -103,10 +103,10 @@ func mapCarsToCarItems(cars []domain.Car) []CarItem {
 	items := make([]CarItem, len(cars))
 	for i, car := range cars {
 		items[i] = CarItem{
-			ID:          car.ID,
-			Name:        car.Name,
-			PriceCents:  car.PriceCents,
-			IsAvailable: car.IsAvailable,
+			ID:         car.ID,
+			Name:       car.Name,
+			PriceCents: car.PriceCents,
+			Status:     string(car.Status),
 		}
 	}
 
@@ -153,10 +153,10 @@ func (h *Handler) GetCarById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	carItem := CarItem{
-		ID:          car.ID,
-		Name:        car.Name,
-		PriceCents:  car.PriceCents,
-		IsAvailable: car.IsAvailable,
+		ID:         car.ID,
+		Name:       car.Name,
+		PriceCents: car.PriceCents,
+		Status:     string(car.Status),
 	}
 	writeJSON(w, http.StatusOK, GetCarResponse{
 		Item: carItem,
@@ -214,10 +214,10 @@ func (h *Handler) CreateCar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	item := CarItem{
-		ID:          car.ID,
-		Name:        car.Name,
-		PriceCents:  car.PriceCents,
-		IsAvailable: car.IsAvailable,
+		ID:         car.ID,
+		Name:       car.Name,
+		PriceCents: car.PriceCents,
+		Status:     string(car.Status),
 	}
 	writeJSON(w, http.StatusCreated, CreateCarResponse{
 		Item: item,
@@ -308,12 +308,92 @@ func (h *Handler) UpdateCar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	item := CarItem{
-		ID:          car.ID,
-		Name:        car.Name,
-		PriceCents:  car.PriceCents,
-		IsAvailable: car.IsAvailable,
+		ID:         car.ID,
+		Name:       car.Name,
+		PriceCents: car.PriceCents,
+		Status:     string(car.Status),
 	}
 	writeJSON(w, http.StatusOK, UpdateCarResponse{Item: item})
+}
+
+// UpdateCarStatus godoc
+// @Summary      Withdraw or relist a car
+// @Description  Withdraws a car from sale (any status except sold) or relists a withdrawn car as available (Admin only). Reserving, releasing and selling a car are not done here.
+// @Tags         cars
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id      path      int                     true  "Car ID"
+// @Param        status  body      UpdateCarStatusRequest  true  "New status"
+// @Success      200     {object}  UpdateCarStatusResponse
+// @Failure      400     {object}  ErrorResponse
+// @Failure      401     {object}  ErrorResponse
+// @Failure      403     {object}  ErrorResponse
+// @Failure      404     {object}  ErrorResponse
+// @Failure      409     {object}  ErrorResponse
+// @Failure      500     {object}  ErrorResponse
+// @Router       /cars/{id}/status [patch]
+func (h *Handler) UpdateCarStatus(w http.ResponseWriter, r *http.Request) {
+	idString := r.PathValue("id")
+
+	id64, err := strconv.ParseInt(idString, 10, 64)
+	if err != nil || id64 <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error: "invalid ID",
+		})
+		return
+	}
+	id := uint(id64)
+
+	var payload UpdateCarStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error: "invalid request body",
+		})
+		return
+	}
+
+	if err := h.validate.Struct(payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error: h.formatValidationError(err),
+		})
+		return
+	}
+
+	car, err := h.service.ChangeCarStatusByDealer(r.Context(), id, domain.CarStatus(payload.Status))
+	if err != nil {
+		if errors.Is(err, repository.ErrItemNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{
+				Error: "item not found",
+			})
+			return
+		}
+		if errors.Is(err, repository.ErrInvalidStatusTransition) {
+			writeJSON(w, http.StatusConflict, ErrorResponse{
+				Error: err.Error(),
+			})
+			return
+		}
+		if errors.Is(err, repository.ErrOptimisticLockFailed) {
+			writeJSON(w, http.StatusConflict, ErrorResponse{
+				Error: "car data locked",
+			})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{
+			Error: "internal error",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, UpdateCarStatusResponse{
+		Item: CarItem{
+			ID:         car.ID,
+			Name:       car.Name,
+			PriceCents: car.PriceCents,
+			Status:     string(car.Status),
+		},
+	})
 }
 
 func (h *Handler) DeleteCar(w http.ResponseWriter, r *http.Request) {

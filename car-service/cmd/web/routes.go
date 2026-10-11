@@ -23,6 +23,7 @@ func routes(handler *handler.Handler) http.Handler {
 		r.Get("/cars/{id}", handler.GetCarById)
 		r.Post("/cars", handler.RequireRole(auth.AdminRole, handler.CreateCar))
 		r.Patch("/cars/{id}", handler.RequireRole(auth.AdminRole, handler.UpdateCar))
+		r.Patch("/cars/{id}/status", handler.RequireRole(auth.AdminRole, handler.UpdateCarStatus))
 		r.Delete("/cars/{id}", handler.RequireRole(auth.AdminRole, handler.DeleteCar))
 	})
 

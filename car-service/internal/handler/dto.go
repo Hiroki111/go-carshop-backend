@@ -5,10 +5,10 @@ type ErrorResponse struct {
 }
 
 type CarItem struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
-	PriceCents  uint   `json:"price_cents"`
-	IsAvailable bool   `json:"is_available"`
+	ID         uint   `json:"id"`
+	Name       string `json:"name"`
+	PriceCents uint   `json:"price_cents"`
+	Status     string `json:"status" enums:"available,reserved,sold,withdrawn" example:"available"`
 }
 
 type GetCarsResponse struct {
@@ -40,6 +40,17 @@ type UpdateCarRequest struct {
 type UpdateCarResponse struct {
 	Item CarItem `json:"item"`
 }
+
+// UpdateCarStatusRequest is what a dealer sends to withdraw a car or to relist
+// a withdrawn one. Reserved and sold are set by the order flow, never here.
+type UpdateCarStatusRequest struct {
+	Status string `json:"status" validate:"required,oneof=available withdrawn" enums:"available,withdrawn" example:"withdrawn"`
+}
+
+type UpdateCarStatusResponse struct {
+	Item CarItem `json:"item"`
+}
+
 type DeleteCarResponse struct {
 	Message string `json:"message"`
 }

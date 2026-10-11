@@ -14,7 +14,7 @@ import (
 
 // FakeCarClient is a test double implementing carclient.CarClient. Set
 // GetCarByIDFunc to control what "car-service" returns for a given test
-// case (an available car, an unavailable one, carclient.ErrCarNotFound, a
+// case (an available car, a reserved one, carclient.ErrCarNotFound, a
 // transport error, etc.) without making a real HTTP call.
 type FakeCarClient struct {
 	GetCarByIDFunc func(ctx context.Context, id uint) (carclient.Car, error)
@@ -25,5 +25,5 @@ func (f *FakeCarClient) GetCarByID(ctx context.Context, id uint) (carclient.Car,
 		return f.GetCarByIDFunc(ctx, id)
 	}
 
-	return carclient.Car{ID: id, Name: "Test Car", PriceCents: 100, IsAvailable: true}, nil
+	return carclient.Car{ID: id, Name: "Test Car", PriceCents: 100, Status: carclient.StatusAvailable}, nil
 }

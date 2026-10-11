@@ -26,7 +26,7 @@ func (s *Service) CreateOrder(ctx context.Context, userId uint, userName string,
 		return err
 	}
 
-	if !car.IsAvailable {
+	if car.Status != carclient.StatusAvailable {
 		return repository.ErrItemNotAvailable
 	}
 

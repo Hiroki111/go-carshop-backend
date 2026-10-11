@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 
@@ -85,7 +86,7 @@ func (r *Repository) GetCarById(id uint) (domain.Car, error) {
 }
 
 func (r *Repository) CreateCar(data domain.Car) (domain.Car, error) {
-	car := domain.Car{Name: data.Name, PriceCents: data.PriceCents}
+	car := domain.Car{Name: data.Name, PriceCents: data.PriceCents, Status: domain.CarStatusAvailable}
 	result := r.db.Create(&car)
 
 	if result.Error != nil {
@@ -163,16 +164,47 @@ func (r *Repository) GetCarForUpdate(tx *gorm.DB, id uint) (domain.Car, error) {
 		return domain.Car{}, err
 	}
 
-	if !car.IsAvailable {
+	if car.Status != domain.CarStatusAvailable {
 		return domain.Car{}, ErrItemNotAvailable
 	}
 
 	return car, nil
 }
 
-// NOTE: Currently unused
-func (r *Repository) UpdateCarAvailability(tx *gorm.DB, id uint, available bool) error {
-	return r.withTx(tx).db.Model(&domain.Car{}).Where("id = ?", id).Update("is_available", available).Error
+// ChangeCarStatus moves a car to a new status. allowed decides which
+// from -> to moves the caller is permitted to make (e.g.
+// domain.CarStatus.CanBeChangedByDealerTo); a move it rejects fails with
+// ErrInvalidStatusTransition.
+func (r *Repository) ChangeCarStatus(id uint, next domain.CarStatus, allowed func(from, to domain.CarStatus) bool) (domain.Car, error) {
+	var car domain.Car
+	if err := r.db.First(&car, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Car{}, ErrItemNotFound
+		}
+		return domain.Car{}, err
+	}
+
+	if !allowed(car.Status, next) {
+		return domain.Car{}, fmt.Errorf("%w: %s -> %s", ErrInvalidStatusTransition, car.Status, next)
+	}
+
+	result := r.db.
+		Model(&car).
+		Where("id = ? AND version = ?", car.ID, car.Version).
+		Updates(map[string]interface{}{
+			"status":  string(next),
+			"version": car.Version + 1,
+		})
+	if err := result.Error; err != nil {
+		return domain.Car{}, err
+	}
+	if result.RowsAffected == 0 {
+		return domain.Car{}, ErrOptimisticLockFailed
+	}
+
+	car.Status = next
+	car.Version++
+	return car, nil
 }
 
 func GetDefaultQueryForCars() GetCarsInput {

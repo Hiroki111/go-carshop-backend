@@ -9,3 +9,5 @@ var ErrItemNotFound = errors.New("item not found")
 var ErrItemNotAvailable = errors.New("item not available")
 
 var ErrCarAlreadyExists = errors.New("car already exists")
+
+var ErrInvalidStatusTransition = errors.New("invalid status transition")

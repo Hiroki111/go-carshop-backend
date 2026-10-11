@@ -121,6 +121,26 @@ func (s *Service) UpdateCar(ctx context.Context, input repository.UpdateCarsInpu
 	return car, nil
 }
 
+// ChangeCarStatusByDealer withdraws a car or relists a withdrawn one. Moves
+// that belong to the order flow (reserve, release, sold) are rejected with
+// repository.ErrInvalidStatusTransition.
+func (s *Service) ChangeCarStatusByDealer(ctx context.Context, id uint, next domain.CarStatus) (domain.Car, error) {
+	car, err := s.repo.ChangeCarStatus(id, next, domain.CarStatus.CanBeChangedByDealerTo)
+	if err != nil {
+		return domain.Car{}, err
+	}
+
+	if err := s.carsCache.InvalidateCars(ctx); err != nil {
+		log.Printf("cache invalidation failed: %v", err)
+	}
+	if err := s.carsCache.SetCar(ctx, cache.CarCacheKey(car.ID), &car, individualCarTTL); err != nil {
+		log.Printf("cache update failed: %v", err)
+	}
+	go s.carsCacheWarmer.WarmCarList(carListTTLWithoutQuery)
+
+	return car, nil
+}
+
 func (s *Service) DeleteCar(ctx context.Context, id uint) error {
 	err := s.repo.DeleteCar(id)
 	if err != nil {

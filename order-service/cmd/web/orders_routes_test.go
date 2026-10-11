@@ -29,31 +29,31 @@ func TestCreateOrder(t *testing.T) {
 	car := carclient.Car{ID: carID, Name: "Test Car", PriceCents: 100}
 
 	tests := []struct {
-		testName       string
-		noToken        bool
-		role           auth.UserRole
-		body           any // defaults to a valid request for carID
-		carErr         error
-		isCarAvailable bool
-		expectedCode   int
+		testName     string
+		noToken      bool
+		role         auth.UserRole
+		body         any // defaults to a valid request for carID
+		carErr       error
+		carStatus    string
+		expectedCode int
 	}{
 		{
-			testName:       "success - customer token",
-			role:           auth.CustomerRole,
-			isCarAvailable: true,
-			expectedCode:   http.StatusCreated,
+			testName:     "success - customer token",
+			role:         auth.CustomerRole,
+			carStatus:    carclient.StatusAvailable,
+			expectedCode: http.StatusCreated,
 		},
 		{
-			testName:       "success - admin token",
-			role:           auth.AdminRole,
-			isCarAvailable: true,
-			expectedCode:   http.StatusCreated,
+			testName:     "success - admin token",
+			role:         auth.AdminRole,
+			carStatus:    carclient.StatusAvailable,
+			expectedCode: http.StatusCreated,
 		},
 		{
-			testName:       "fail - no token",
-			noToken:        true,
-			isCarAvailable: true,
-			expectedCode:   http.StatusUnauthorized,
+			testName:     "fail - no token",
+			noToken:      true,
+			carStatus:    carclient.StatusAvailable,
+			expectedCode: http.StatusUnauthorized,
 		},
 		{
 			testName:     "fail - car not found",
@@ -62,10 +62,28 @@ func TestCreateOrder(t *testing.T) {
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			testName:       "fail - car not available",
-			role:           auth.CustomerRole,
-			isCarAvailable: false,
-			expectedCode:   http.StatusConflict,
+			testName:     "fail - car is reserved",
+			role:         auth.CustomerRole,
+			carStatus:    carclient.StatusReserved,
+			expectedCode: http.StatusConflict,
+		},
+		{
+			testName:     "fail - car is sold",
+			role:         auth.CustomerRole,
+			carStatus:    carclient.StatusSold,
+			expectedCode: http.StatusConflict,
+		},
+		{
+			testName:     "fail - car is withdrawn",
+			role:         auth.CustomerRole,
+			carStatus:    carclient.StatusWithdrawn,
+			expectedCode: http.StatusConflict,
+		},
+		{
+			testName:     "fail - car has an unrecognised status",
+			role:         auth.CustomerRole,
+			carStatus:    "banana",
+			expectedCode: http.StatusConflict,
 		},
 		{
 			testName:     "fail - car-service is failing",
@@ -74,11 +92,11 @@ func TestCreateOrder(t *testing.T) {
 			expectedCode: http.StatusInternalServerError,
 		},
 		{
-			testName:       "fail - malformed body",
-			role:           auth.CustomerRole,
-			body:           "not an object",
-			isCarAvailable: true,
-			expectedCode:   http.StatusBadRequest,
+			testName:     "fail - malformed body",
+			role:         auth.CustomerRole,
+			body:         "not an object",
+			carStatus:    carclient.StatusAvailable,
+			expectedCode: http.StatusBadRequest,
 		},
 	}
 
@@ -92,7 +110,7 @@ func TestCreateOrder(t *testing.T) {
 						return carclient.Car{}, test.carErr
 					}
 					c := car
-					c.IsAvailable = test.isCarAvailable
+					c.Status = test.carStatus
 					return c, nil
 				},
 			}
