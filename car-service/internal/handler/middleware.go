@@ -11,8 +11,10 @@ import (
 type contextKey string
 
 const (
-	UserIDKey contextKey = "userID"
-	RoleKey   contextKey = "role"
+	UserIDKey  contextKey = "userID"
+	RoleKey    contextKey = "role"
+	SubjectKey contextKey = "subject"
+	ScopeKey   contextKey = "scope"
 )
 
 func (h *Handler) RequireToken(next http.HandlerFunc) http.HandlerFunc {
@@ -37,6 +39,8 @@ func (h *Handler) RequireToken(next http.HandlerFunc) http.HandlerFunc {
 
 		ctx := context.WithValue(r.Context(), UserIDKey, identity.UserID)
 		ctx = context.WithValue(ctx, RoleKey, identity.Role)
+		ctx = context.WithValue(ctx, SubjectKey, identity.Subject)
+		ctx = context.WithValue(ctx, ScopeKey, identity.Scope)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
@@ -51,6 +55,19 @@ func (h *Handler) RequireRole(requiredRole auth.UserRole, next http.HandlerFunc)
 		}
 
 		if role != requiredRole {
+			writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "forbidden"})
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (h *Handler) RequireScope(requiredScope string, next http.HandlerFunc) http.HandlerFunc {
+	return h.RequireToken(func(w http.ResponseWriter, r *http.Request) {
+		scope, _ := r.Context().Value(ScopeKey).(string)
+
+		if !auth.HasScope(scope, requiredScope) {
 			writeJSON(w, http.StatusForbidden, ErrorResponse{Error: "forbidden"})
 			return
 		}

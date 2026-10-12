@@ -53,6 +53,52 @@ func TestParseJWTToken_ValidToken(t *testing.T) {
 	}
 }
 
+func TestParseJWTToken_ServiceToken(t *testing.T) {
+	key := newKey(t)
+
+	claims := validClaims("")
+	claims.UserID = 0
+	claims.Subject = "order-service"
+	claims.Scope = "cars:reserve cars:release"
+	token := sign(t, jwt.SigningMethodRS256, key, claims)
+
+	identity, err := ParseJWTToken(&key.PublicKey, token)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := Identity{Subject: "order-service", Scope: "cars:reserve cars:release"}
+	if identity != want {
+		t.Fatalf("expected %+v, got %+v", want, identity)
+	}
+}
+
+func TestHasScope(t *testing.T) {
+	tests := []struct {
+		name     string
+		scope    string
+		required string
+		want     bool
+	}{
+		{name: "empty scope", scope: "", required: ScopeCarsReserve, want: false},
+		{name: "exact match", scope: "cars:reserve", required: ScopeCarsReserve, want: true},
+		{name: "one of several", scope: "cars:release cars:reserve", required: ScopeCarsReserve, want: true},
+		{name: "surrounding whitespace", scope: "  cars:reserve  ", required: ScopeCarsReserve, want: true},
+		{name: "longer scope with the same prefix", scope: "cars:reserved", required: ScopeCarsReserve, want: false},
+		{name: "shorter scope", scope: "cars", required: ScopeCarsReserve, want: false},
+		{name: "different scope", scope: "cars:release", required: ScopeCarsReserve, want: false},
+		{name: "empty required scope is never granted", scope: "cars:reserve", required: "", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := HasScope(test.scope, test.required); got != test.want {
+				t.Fatalf("HasScope(%q, %q) = %v, want %v", test.scope, test.required, got, test.want)
+			}
+		})
+	}
+}
+
 func TestParseJWTToken_Rejections(t *testing.T) {
 	key := newKey(t)
 	otherKey := newKey(t)

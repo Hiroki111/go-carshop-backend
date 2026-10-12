@@ -25,6 +25,9 @@ func routes(handler *handler.Handler) http.Handler {
 		r.Patch("/cars/{id}", handler.RequireRole(auth.AdminRole, handler.UpdateCar))
 		r.Patch("/cars/{id}/status", handler.RequireRole(auth.AdminRole, handler.UpdateCarStatus))
 		r.Delete("/cars/{id}", handler.RequireRole(auth.AdminRole, handler.DeleteCar))
+
+		// internal: called by other services with a service token (scope), not by users
+		r.Post("/internal/cars/{id}/reservations", handler.RequireScope(auth.ScopeCarsReserve, handler.ReserveCar))
 	})
 
 	// public

@@ -212,6 +212,35 @@ func (r *Repository) ChangeCarStatus(id uint, next domain.CarStatus, allowed fun
 	return car, nil
 }
 
+func (r *Repository) ReserveCar(id, orderID uint) (domain.Car, error) {
+	result := r.db.
+		Model(&domain.Car{}).
+		Where("id = ? AND status = ?", id, string(domain.CarStatusAvailable)).
+		Updates(map[string]interface{}{
+			"status":               string(domain.CarStatusReserved),
+			"reserved_by_order_id": orderID,
+			"version":              gorm.Expr("version + 1"),
+		})
+	if err := result.Error; err != nil {
+		return domain.Car{}, err
+	}
+
+	car, err := r.GetCarById(id)
+	if err != nil {
+		return domain.Car{}, err
+	}
+
+	if result.RowsAffected == 1 {
+		return car, nil
+	}
+
+	if car.Status == domain.CarStatusReserved && car.ReservedByOrderID != nil && *car.ReservedByOrderID == orderID {
+		return car, nil
+	}
+
+	return domain.Car{}, fmt.Errorf("%w: car is %s", ErrItemNotAvailable, car.Status)
+}
+
 func GetDefaultQueryForCars() GetCarsInput {
 	return GetCarsInput{
 		OrderBy:  "",

@@ -62,6 +62,33 @@ func tokenFor(t *testing.T, role auth.UserRole) string {
 	return signToken(t, trustedKey, role, time.Now().Add(time.Hour))
 }
 
+// signServiceToken signs a token like the one user-service will issue to
+// another service (OAuth2 client credentials): it has a subject and scopes, but
+// no user ID and no role.
+func signServiceToken(t *testing.T, key *rsa.PrivateKey, subject, scope string, expiresAt time.Time) string {
+	t.Helper()
+
+	claims := auth.Claims{
+		Scope: scope,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   subject,
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+		},
+	}
+	s, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(key)
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+	return s
+}
+
+// serviceTokenFor returns a valid service token for order-service with the
+// given scopes (space-separated) that the app under test accepts.
+func serviceTokenFor(t *testing.T, scope string) string {
+	t.Helper()
+	return signServiceToken(t, trustedKey, "order-service", scope, time.Now().Add(time.Hour))
+}
+
 func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
 	t.Helper()
 
@@ -72,6 +99,14 @@ func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
 	if err != nil {
 		t.Fatalf("failed to open sqlite db: %v", err)
 	}
+
+	return newTestApp(t, db), db
+}
+
+// newTestApp wires the app on top of db and migrates it. setupTestApp uses it
+// with SQLite; tests about concurrency pass a real Postgres.
+func newTestApp(t *testing.T, db *gorm.DB) http.Handler {
+	t.Helper()
 
 	repo := repository.NewRepository(db)
 
@@ -84,7 +119,7 @@ func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
 	service := service.NewService(repo, carsCache, carsCacheWarmer)
 
 	handler := handler.NewHandler(service, &trustedKey.PublicKey)
-	return routes(handler), db
+	return routes(handler)
 }
 
 func executeRequest(

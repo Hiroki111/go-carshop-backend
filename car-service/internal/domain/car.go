@@ -43,8 +43,9 @@ func (s CarStatus) CanBeChangedByDealerTo(next CarStatus) bool {
 
 type Car struct {
 	gorm.Model
-	Name       string    `gorm:"uniqueIndex;not null"`
-	PriceCents uint      `gorm:"not null"`
-	Version    uint      `gorm:"not null;default:1"`
-	Status     CarStatus `gorm:"not null;default:available;check:chk_cars_status,status IN ('available','reserved','sold','withdrawn')"`
+	Name              string    `gorm:"uniqueIndex;not null"`
+	PriceCents        uint      `gorm:"not null"`
+	Version           uint      `gorm:"not null;default:1"`
+	Status            CarStatus `gorm:"not null;default:available;check:chk_cars_status,status IN ('available','reserved','sold','withdrawn')"`
+	ReservedByOrderID *uint
 }

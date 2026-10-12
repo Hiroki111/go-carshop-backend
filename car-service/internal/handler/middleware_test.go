@@ -179,3 +179,133 @@ func TestRequireRole_AdminOnlyRoute(t *testing.T) {
 		})
 	}
 }
+
+func signServiceToken(t *testing.T, key *rsa.PrivateKey, subject, scope string, expiresAt time.Time) string {
+	t.Helper()
+
+	claims := auth.Claims{
+		Scope: scope,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   subject,
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+		},
+	}
+	s, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(key)
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+	return s
+}
+
+func TestRequireScope(t *testing.T) {
+	trustedKey := newTestKey(t)
+	attackerKey := newTestKey(t)
+	h := &Handler{publicKey: &trustedKey.PublicKey}
+	exp := time.Now().Add(time.Hour)
+
+	tests := []struct {
+		name           string
+		authHeader     string
+		expectStatus   int
+		expectNextCall bool
+	}{
+		{name: "no token", expectStatus: http.StatusUnauthorized},
+		{
+			name:         "service token signed by a different key",
+			authHeader:   "Bearer " + signServiceToken(t, attackerKey, "order-service", auth.ScopeCarsReserve, exp),
+			expectStatus: http.StatusUnauthorized,
+		},
+		{
+			name:         "expired service token",
+			authHeader:   "Bearer " + signServiceToken(t, trustedKey, "order-service", auth.ScopeCarsReserve, time.Now().Add(-time.Hour)),
+			expectStatus: http.StatusUnauthorized,
+		},
+		{
+			name:           "service token with the scope",
+			authHeader:     "Bearer " + signServiceToken(t, trustedKey, "order-service", auth.ScopeCarsReserve, exp),
+			expectStatus:   http.StatusOK,
+			expectNextCall: true,
+		},
+		{
+			name:           "service token with several scopes",
+			authHeader:     "Bearer " + signServiceToken(t, trustedKey, "order-service", "cars:release cars:reserve", exp),
+			expectStatus:   http.StatusOK,
+			expectNextCall: true,
+		},
+		{
+			name:         "service token with another scope",
+			authHeader:   "Bearer " + signServiceToken(t, trustedKey, "order-service", "cars:release", exp),
+			expectStatus: http.StatusForbidden,
+		},
+		{
+			name:         "service token with a look-alike scope",
+			authHeader:   "Bearer " + signServiceToken(t, trustedKey, "order-service", "cars:reserved", exp),
+			expectStatus: http.StatusForbidden,
+		},
+		{
+			name:         "service token without any scope",
+			authHeader:   "Bearer " + signServiceToken(t, trustedKey, "order-service", "", exp),
+			expectStatus: http.StatusForbidden,
+		},
+		{
+			name:         "admin token",
+			authHeader:   "Bearer " + signRS256(t, trustedKey, 1, auth.AdminRole, exp),
+			expectStatus: http.StatusForbidden,
+		},
+		{
+			name:         "customer token",
+			authHeader:   "Bearer " + signRS256(t, trustedKey, 1, auth.CustomerRole, exp),
+			expectStatus: http.StatusForbidden,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nextCalled := false
+			next := func(w http.ResponseWriter, r *http.Request) {
+				nextCalled = true
+				w.WriteHeader(http.StatusOK)
+
+				if got := r.Context().Value(SubjectKey); got != "order-service" {
+					t.Errorf("expected subject %q in context, got %v", "order-service", got)
+				}
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "/internal", nil)
+			if test.authHeader != "" {
+				req.Header.Set("Authorization", test.authHeader)
+			}
+			rec := httptest.NewRecorder()
+
+			h.RequireScope(auth.ScopeCarsReserve, next).ServeHTTP(rec, req)
+
+			if rec.Code != test.expectStatus {
+				t.Fatalf("expected status %d, got %d", test.expectStatus, rec.Code)
+			}
+			if nextCalled != test.expectNextCall {
+				t.Fatalf("expected next handler called = %v, got %v", test.expectNextCall, nextCalled)
+			}
+		})
+	}
+}
+
+func TestRequireRole_RejectsServiceToken(t *testing.T) {
+	trustedKey := newTestKey(t)
+	h := &Handler{publicKey: &trustedKey.PublicKey}
+
+	nextCalled := false
+	next := func(w http.ResponseWriter, r *http.Request) { nextCalled = true }
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+signServiceToken(t, trustedKey, "order-service", auth.ScopeCarsReserve, time.Now().Add(time.Hour)))
+	rec := httptest.NewRecorder()
+
+	h.RequireRole(auth.AdminRole, next).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, rec.Code)
+	}
+	if nextCalled {
+		t.Fatal("next handler must not be called")
+	}
+}

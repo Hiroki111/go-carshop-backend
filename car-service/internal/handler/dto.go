@@ -51,6 +51,14 @@ type UpdateCarStatusResponse struct {
 	Item CarItem `json:"item"`
 }
 
+type ReserveCarRequest struct {
+	OrderID uint `json:"order_id" validate:"required,gt=0" example:"42"`
+}
+
+type ReserveCarResponse struct {
+	Item CarItem `json:"item"`
+}
+
 type DeleteCarResponse struct {
 	Message string `json:"message"`
 }
