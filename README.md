@@ -77,6 +77,24 @@ docker exec -i car-service-db psql -U car_service_user -d car_service < migratio
 The service uses PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.
 Stop the dependencies with `docker compose down`. Their data persists in Docker volumes; use `docker compose down -v` only when you intentionally want to delete local database and cache data.
 
+### Running the tests
+
+Most tests need nothing but Go:
+
+```bash
+cd car-service
+go test ./...
+```
+
+The tests about concurrency (for example, many customers reserving the same car at once) need a real PostgreSQL, because an in-memory SQLite database serializes every write and would hide the race. They are skipped unless `TEST_POSTGRES_DSN` points at a Postgres. With the databases from `docker compose up -d` running:
+
+```bash
+cd car-service
+TEST_POSTGRES_DSN="postgres://car_service_user:password@localhost:5432/car_service?sslmode=disable" go test ./...
+```
+
+Each such test creates its own throwaway schema and drops it when it finishes, so the data the app uses is never touched. In CI, run a Postgres container next to the job (for example a `services:` block in GitHub Actions) and set the same variable.
+
 ## Note:
 
 ### How to develop and run the app
