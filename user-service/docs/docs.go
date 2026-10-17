@@ -76,6 +76,79 @@ const docTemplate = `{
                 }
             }
         },
+        "/oauth/token": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "OAuth2 token endpoint for the client-credentials grant (RFC 6749 section 4.4). A registered service (for example order-service) authenticates with its client ID and secret and receives a short-lived access token that carries scopes such as cars:reserve. The client authenticates with HTTP Basic (preferred) or with client_id and client_secret in the body, not both. Without a scope parameter the token gets every scope the client is allowed.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Issue a service token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Must be client_credentials",
+                        "name": "grant_type",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Space-separated scopes to request",
+                        "name": "scope",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Client ID, when not using HTTP Basic",
+                        "name": "client_id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Client secret, when not using HTTP Basic",
+                        "name": "client_secret",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.OAuthErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.OAuthErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.OAuthErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/register-customer": {
             "post": {
                 "description": "Creates a new user with the Customer role.",
@@ -164,6 +237,18 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.OAuthErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "invalid_client"
+                },
+                "error_description": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.RegisterUserRequest": {
             "type": "object",
             "required": [
@@ -187,6 +272,33 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "handler.TokenResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "description": "ExpiresIn is the lifetime of the token in seconds.",
+                    "type": "integer",
+                    "example": 300
+                },
+                "scope": {
+                    "description": "Scope is the space-separated list of granted scopes.",
+                    "type": "string",
+                    "example": "cars:reserve"
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BasicAuth": {
+            "type": "basic"
         }
     }
 }`

@@ -22,6 +22,14 @@ definitions:
       token_type:
         type: string
     type: object
+  handler.OAuthErrorResponse:
+    properties:
+      error:
+        example: invalid_client
+        type: string
+      error_description:
+        type: string
+    type: object
   handler.RegisterUserRequest:
     properties:
       password:
@@ -36,6 +44,22 @@ definitions:
   handler.RegisterUserResponse:
     properties:
       status:
+        type: string
+    type: object
+  handler.TokenResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        description: ExpiresIn is the lifetime of the token in seconds.
+        example: 300
+        type: integer
+      scope:
+        description: Scope is the space-separated list of granted scopes.
+        example: cars:reserve
+        type: string
+      token_type:
+        example: Bearer
         type: string
     type: object
 host: localhost:8082
@@ -86,6 +110,58 @@ paths:
       summary: User Login
       tags:
       - auth
+  /oauth/token:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: OAuth2 token endpoint for the client-credentials grant (RFC 6749
+        section 4.4). A registered service (for example order-service) authenticates
+        with its client ID and secret and receives a short-lived access token that
+        carries scopes such as cars:reserve. The client authenticates with HTTP Basic
+        (preferred) or with client_id and client_secret in the body, not both. Without
+        a scope parameter the token gets every scope the client is allowed.
+      parameters:
+      - description: Must be client_credentials
+        in: formData
+        name: grant_type
+        required: true
+        type: string
+      - description: Space-separated scopes to request
+        in: formData
+        name: scope
+        type: string
+      - description: Client ID, when not using HTTP Basic
+        in: formData
+        name: client_id
+        type: string
+      - description: Client secret, when not using HTTP Basic
+        in: formData
+        name: client_secret
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.OAuthErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.OAuthErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.OAuthErrorResponse'
+      security:
+      - BasicAuth: []
+      summary: Issue a service token
+      tags:
+      - auth
   /register-customer:
     post:
       consumes:
@@ -120,4 +196,7 @@ paths:
       summary: Register a Customer
       tags:
       - auth
+securityDefinitions:
+  BasicAuth:
+    type: basic
 swagger: "2.0"

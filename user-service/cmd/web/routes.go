@@ -19,6 +19,7 @@ func routes(handler *handler.Handler) http.Handler {
 
 		r.Post("/register-customer", handler.RegisterCustomer)
 		r.Post("/login-user", handler.LoginUser)
+		r.Post("/oauth/token", handler.IssueToken)
 	})
 
 	// infra / public routes

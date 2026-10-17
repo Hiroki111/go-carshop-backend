@@ -47,6 +47,25 @@ You should end up with:
 
 The `keys/` folders are gitignored. Docker Compose mounts these files into the containers, so they are not baked into any image. If you regenerate the key pair, copy the new `public.pem` again and restart the services; tokens signed with the old key stop being valid.
 
+### Tokens for service-to-service calls
+
+When one service calls an internal endpoint of another (for example order-service reserving a car in car-service), it does not use a customer's token. It authenticates as itself with the OAuth2 client-credentials grant and receives a short-lived token with scopes such as `cars:reserve`. user-service issues these tokens at `POST /oauth/token`, signed with the same key as user tokens, so car-service verifies them with the public key it already has. The endpoint it calls checks the scope, so a customer or admin token can't use it.
+
+Give each client a secret. Generate one with `openssl rand -hex 32` and put it in `user-service/.env` (see `.env.example`):
+```bash
+ORDER_SERVICE_CLIENT_SECRET=<output of openssl rand -hex 32>
+```
+user-service refuses to start without it. order-service gets the same value as its client secret. Stick to hex or alphanumeric secrets: HTTP clients that don't form-encode the Basic credentials, as RFC 6749 section 2.3.1 requires, mangle characters such as `+` and `%`.
+
+Request a token (`-u` sends the client ID and secret as HTTP Basic credentials). The secret lives in `user-service/.env`, which your terminal does not read, so load it into your shell first. If the variable is empty, curl sends an empty password and you get `invalid_client`:
+```bash
+export ORDER_SERVICE_CLIENT_SECRET=$(grep '^ORDER_SERVICE_CLIENT_SECRET=' user-service/.env | cut -d= -f2-)
+curl -s -u "order-service:$ORDER_SERVICE_CLIENT_SECRET" \
+  -d grant_type=client_credentials -d scope=cars:reserve \
+  http://localhost:8082/oauth/token
+```
+The response has `access_token`, `token_type`, `expires_in` (seconds) and `scope`. Without a `scope` parameter the token gets every scope the client is allowed. Use it as `Authorization: Bearer <access_token>` on the internal endpoint, for example `POST /internal/cars/{id}/reservations` in car-service.
+
 ### Running a service locally
 
 Start the databases and Redis from the repository root:

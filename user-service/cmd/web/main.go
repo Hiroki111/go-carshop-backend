@@ -12,6 +12,7 @@ import (
 
 	"github.com/Hiroki111/go-carshop-backend/user-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/user-service/internal/handler"
+	"github.com/Hiroki111/go-carshop-backend/user-service/internal/oauth"
 	"github.com/Hiroki111/go-carshop-backend/user-service/internal/repository"
 	"github.com/Hiroki111/go-carshop-backend/user-service/internal/service"
 	"github.com/joho/godotenv"
@@ -36,6 +37,8 @@ const portNumber = ":8082"
 
 // @host      localhost:8082
 // @BasePath  /
+
+// @securityDefinitions.basic BasicAuth
 func main() {
 	// NOTE: Ignore error; variables might be injected by Docker/K8s
 	_ = godotenv.Load()
@@ -56,6 +59,11 @@ func main() {
 		log.Fatal("ADMIN_USERNAME and ADMIN_PASSWORD must both be set")
 	}
 
+	clients, err := newOAuthClientRegistry()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	db, err := newPostgresDB()
 	if err != nil {
 		log.Fatal(err)
@@ -74,7 +82,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	svc := service.NewService(repo, privateKey)
+	svc := service.NewService(repo, privateKey, clients)
 	h := handler.NewHandler(svc)
 
 	server := &http.Server{
@@ -116,6 +124,19 @@ func main() {
 	}
 
 	fmt.Println("Server exited properly")
+}
+
+func newOAuthClientRegistry() (*oauth.Registry, error) {
+	orderService, err := oauth.NewClient(
+		"order-service",
+		os.Getenv("ORDER_SERVICE_CLIENT_SECRET"),
+		[]string{oauth.ScopeCarsReserve, oauth.ScopeCarsRelease, oauth.ScopeCarsSold},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ORDER_SERVICE_CLIENT_SECRET: %w", err)
+	}
+
+	return oauth.NewRegistry(orderService)
 }
 
 func newPostgresDB() (*gorm.DB, error) {
