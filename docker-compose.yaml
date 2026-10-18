@@ -35,6 +35,8 @@ services:
       - DB_HOST=order-service-db
       - DB_PORT=5432
       - CAR_SERVICE_URL=http://car-service:8080
+      - USER_SERVICE_URL=http://user-service:8082
+      - OAUTH_CLIENT_ID=order-service
       - PUBLIC_KEY_PATH=/app/keys/public.pem
     volumes:
       - ./order-service/keys/public.pem:/app/keys/public.pem:ro
@@ -42,6 +44,8 @@ services:
       order-service-db:
         condition: service_healthy
       car-service:
+        condition: service_started
+      user-service:
         condition: service_started
 
   user-service:

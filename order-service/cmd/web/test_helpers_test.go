@@ -56,8 +56,9 @@ func tokenFor(t *testing.T, key *rsa.PrivateKey, userID uint, role auth.UserRole
 // with that key to be accepted.
 //
 // Pass nil for carClient to get the default carclienttest.FakeCarClient
-// (every car exists and is available); pass a *carclienttest.FakeCarClient
-// with GetCarByIDFunc set to exercise a specific scenario.
+// (every car exists, is available and can be reserved); pass a
+// *carclienttest.FakeCarClient with GetCarByIDFunc / ReserveCarFunc set to
+// exercise a specific scenario.
 func setupTestApp(t *testing.T, carClient carclient.CarClient) (http.Handler, *gorm.DB, *rsa.PrivateKey) {
 	t.Helper()
 
@@ -126,6 +127,9 @@ func seedOrders(t *testing.T, db *gorm.DB, orders []domain.Order) []domain.Order
 	seededOrders := make([]domain.Order, len(orders))
 	for i, order := range orders {
 		order.CreatedAt = base.Add(time.Duration(i) * time.Second)
+		if order.Status == "" {
+			order.Status = domain.OrderStatusFailed
+		}
 		require.NoError(t, db.Create(&order).Error)
 		seededOrders[i] = order
 	}

@@ -20,6 +20,10 @@ import (
 	"gorm.io/gorm"
 )
 
+type reserveCall struct {
+	carID, orderID uint
+}
+
 func TestCreateOrder(t *testing.T) {
 	const (
 		userID   = uint(7)
@@ -29,25 +33,34 @@ func TestCreateOrder(t *testing.T) {
 	car := carclient.Car{ID: carID, Name: "Test Car", PriceCents: 100}
 
 	tests := []struct {
-		testName     string
-		noToken      bool
-		role         auth.UserRole
-		body         any // defaults to a valid request for carID
-		carErr       error
-		carStatus    string
+		testName   string
+		noToken    bool
+		role       auth.UserRole
+		body       any // defaults to a valid request for carID
+		carErr     error
+		carStatus  string
+		reserveErr error
+
 		expectedCode int
+		// expectedOrderStatus is the status of the one order that should exist
+		// afterwards. Empty means no order may exist: the request was rejected
+		// before anything was written, and car-service must not be asked to
+		// reserve anything.
+		expectedOrderStatus domain.OrderStatus
 	}{
 		{
-			testName:     "success - customer token",
-			role:         auth.CustomerRole,
-			carStatus:    carclient.StatusAvailable,
-			expectedCode: http.StatusCreated,
+			testName:            "success - customer token",
+			role:                auth.CustomerRole,
+			carStatus:           carclient.StatusAvailable,
+			expectedCode:        http.StatusCreated,
+			expectedOrderStatus: domain.OrderStatusConfirmed,
 		},
 		{
-			testName:     "success - admin token",
-			role:         auth.AdminRole,
-			carStatus:    carclient.StatusAvailable,
-			expectedCode: http.StatusCreated,
+			testName:            "success - admin token",
+			role:                auth.AdminRole,
+			carStatus:           carclient.StatusAvailable,
+			expectedCode:        http.StatusCreated,
+			expectedOrderStatus: domain.OrderStatusConfirmed,
 		},
 		{
 			testName:     "fail - no token",
@@ -98,11 +111,39 @@ func TestCreateOrder(t *testing.T) {
 			carStatus:    carclient.StatusAvailable,
 			expectedCode: http.StatusBadRequest,
 		},
+		{
+			// Another customer reserved the car between our read and our reserve.
+			testName:            "fail - car-service refuses the reservation",
+			role:                auth.CustomerRole,
+			carStatus:           carclient.StatusAvailable,
+			reserveErr:          carclient.ErrCarNotAvailable,
+			expectedCode:        http.StatusConflict,
+			expectedOrderStatus: domain.OrderStatusFailed,
+		},
+		{
+			testName:            "fail - car disappears before the reservation",
+			role:                auth.CustomerRole,
+			carStatus:           carclient.StatusAvailable,
+			reserveErr:          carclient.ErrCarNotFound,
+			expectedCode:        http.StatusNotFound,
+			expectedOrderStatus: domain.OrderStatusFailed,
+		},
+		{
+			// We do not know whether the car got reserved, so the order must not
+			// be marked failed.
+			testName:            "unknown outcome - the reservation call fails",
+			role:                auth.CustomerRole,
+			carStatus:           carclient.StatusAvailable,
+			reserveErr:          errors.New("timeout"),
+			expectedCode:        http.StatusServiceUnavailable,
+			expectedOrderStatus: domain.OrderStatusPending,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
 			var requestedCarIDs []uint
+			var reserveCalls []reserveCall
 			carClient := &carclienttest.FakeCarClient{
 				GetCarByIDFunc: func(ctx context.Context, id uint) (carclient.Car, error) {
 					requestedCarIDs = append(requestedCarIDs, id)
@@ -111,6 +152,15 @@ func TestCreateOrder(t *testing.T) {
 					}
 					c := car
 					c.Status = test.carStatus
+					return c, nil
+				},
+				ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+					reserveCalls = append(reserveCalls, reserveCall{carID: id, orderID: orderID})
+					if test.reserveErr != nil {
+						return carclient.Car{}, test.reserveErr
+					}
+					c := car
+					c.Status = carclient.StatusReserved
 					return c, nil
 				},
 			}
@@ -132,22 +182,141 @@ func TestCreateOrder(t *testing.T) {
 			var orders []domain.Order
 			require.NoError(t, db.Find(&orders).Error)
 
-			if test.expectedCode != http.StatusCreated {
+			if test.expectedOrderStatus == "" {
 				require.Empty(t, orders, "a rejected request must not create an order")
+				require.Empty(t, reserveCalls, "a rejected request must not reserve a car")
 				return
 			}
 
-			require.Equal(t, "success", decodeBody[handler.CreateOrderResponse](t, rec).Message)
-			require.Equal(t, []uint{carID}, requestedCarIDs)
-
 			require.Len(t, orders, 1)
-			require.Equal(t, userID, orders[0].UserID, "the order belongs to the token's user")
-			require.Equal(t, userName, orders[0].UserName, "the order snapshots the token's user name")
-			require.Equal(t, carID, orders[0].CarID)
-			require.Equal(t, car.Name, orders[0].CarName)
-			require.Equal(t, car.PriceCents, orders[0].PriceCents)
+			order := orders[0]
+			require.Equal(t, test.expectedOrderStatus, order.Status)
+			require.Equal(t, userID, order.UserID, "the order belongs to the token's user")
+			require.Equal(t, userName, order.UserName, "the order snapshots the token's user name")
+			require.Equal(t, carID, order.CarID)
+			require.Equal(t, car.Name, order.CarName)
+			require.Equal(t, car.PriceCents, order.PriceCents)
+
+			require.Equal(t, []uint{carID}, requestedCarIDs)
+			require.Equal(t, []reserveCall{{carID: carID, orderID: order.ID}}, reserveCalls,
+				"car-service is asked once, with the order's own ID as the idempotency key")
+
+			if test.expectedCode == http.StatusCreated {
+				resp := decodeBody[handler.CreateOrderResponse](t, rec)
+				require.Equal(t, "success", resp.Message)
+				require.Equal(t, order.ID, resp.ID)
+				require.Equal(t, string(domain.OrderStatusConfirmed), resp.Status)
+			}
 		})
 	}
+}
+
+func TestCreateOrder_ReservedButNotConfirmedStaysPending(t *testing.T) {
+	const carID = uint(5)
+
+	var db *gorm.DB
+	carClient := &carclienttest.FakeCarClient{
+		ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+			// Someone else moves the order out of "pending" while the call is
+			// in flight, so the pending -> confirmed update matches nothing.
+			require.NoError(t, db.Model(&domain.Order{}).Where("id = ?", orderID).Update("status", string(domain.OrderStatusFailed)).Error)
+			return carclient.Car{ID: id, Status: carclient.StatusReserved}, nil
+		},
+	}
+	app, testDB, trustedKey := setupTestApp(t, carClient)
+	db = testDB
+
+	token := tokenFor(t, trustedKey, 1, auth.CustomerRole)
+	rec := executeRequest(t, app, http.MethodPost, "/orders", token, handler.CreateOrderRequest{CarID: carID})
+
+	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	require.Contains(t, decodeBody[handler.ErrorResponse](t, rec).Error, "pending")
+}
+
+// One car, one live order: the second customer is turned away by the order
+// database itself, before car-service is asked anything.
+func TestCreateOrder_SecondLiveOrderForTheSameCarIsRejected(t *testing.T) {
+	const carID = uint(5)
+
+	var reserveCalls []reserveCall
+	carClient := &carclienttest.FakeCarClient{
+		ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+			reserveCalls = append(reserveCalls, reserveCall{carID: id, orderID: orderID})
+			return carclient.Car{ID: id, Status: carclient.StatusReserved}, nil
+		},
+	}
+	app, db, trustedKey := setupTestApp(t, carClient)
+
+	first := executeRequest(t, app, http.MethodPost, "/orders", tokenFor(t, trustedKey, 1, auth.CustomerRole), handler.CreateOrderRequest{CarID: carID})
+	require.Equal(t, http.StatusCreated, first.Code)
+	second := executeRequest(t, app, http.MethodPost, "/orders", tokenFor(t, trustedKey, 2, auth.CustomerRole), handler.CreateOrderRequest{CarID: carID})
+	require.Equal(t, http.StatusConflict, second.Code)
+
+	var orders []domain.Order
+	require.NoError(t, db.Find(&orders).Error)
+	require.Len(t, orders, 1)
+	require.Equal(t, uint(1), orders[0].UserID)
+	require.Len(t, reserveCalls, 1, "the rejected customer never reaches car-service")
+}
+
+// A failed order does not hold the car, so the next customer can try.
+func TestCreateOrder_CarCanBeOrderedAgainAfterAFailedOrder(t *testing.T) {
+	const carID = uint(5)
+
+	var reserveErr error
+	carClient := &carclienttest.FakeCarClient{
+		ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+			return carclient.Car{ID: id, Status: carclient.StatusReserved}, reserveErr
+		},
+	}
+	app, db, trustedKey := setupTestApp(t, carClient)
+	body := handler.CreateOrderRequest{CarID: carID}
+
+	reserveErr = carclient.ErrCarNotAvailable
+	first := executeRequest(t, app, http.MethodPost, "/orders", tokenFor(t, trustedKey, 1, auth.CustomerRole), body)
+	require.Equal(t, http.StatusConflict, first.Code)
+
+	reserveErr = nil
+	second := executeRequest(t, app, http.MethodPost, "/orders", tokenFor(t, trustedKey, 2, auth.CustomerRole), body)
+	require.Equal(t, http.StatusCreated, second.Code)
+
+	var orders []domain.Order
+	require.NoError(t, db.Order("id asc").Find(&orders).Error)
+	require.Len(t, orders, 2)
+	require.Equal(t, domain.OrderStatusFailed, orders[0].Status)
+	require.Equal(t, domain.OrderStatusConfirmed, orders[1].Status)
+}
+
+// An admin can clear a stuck pending order; deleting it frees the car.
+func TestCreateOrder_DeletingAPendingOrderFreesTheCar(t *testing.T) {
+	const carID = uint(5)
+
+	var reserveErr error
+	carClient := &carclienttest.FakeCarClient{
+		ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+			return carclient.Car{ID: id, Status: carclient.StatusReserved}, reserveErr
+		},
+	}
+	app, db, trustedKey := setupTestApp(t, carClient)
+	customer := tokenFor(t, trustedKey, 1, auth.CustomerRole)
+	admin := tokenFor(t, trustedKey, 99, auth.AdminRole)
+	body := handler.CreateOrderRequest{CarID: carID}
+
+	reserveErr = errors.New("timeout")
+	stuck := executeRequest(t, app, http.MethodPost, "/orders", customer, body)
+	require.Equal(t, http.StatusServiceUnavailable, stuck.Code)
+
+	reserveErr = nil
+	blocked := executeRequest(t, app, http.MethodPost, "/orders", customer, body)
+	require.Equal(t, http.StatusConflict, blocked.Code, "the pending order still holds the car")
+
+	var pending domain.Order
+	require.NoError(t, db.Where("status = ?", string(domain.OrderStatusPending)).First(&pending).Error)
+	deleted := executeRequest(t, app, http.MethodDelete, fmt.Sprintf("/orders/%d", pending.ID), admin, nil)
+	require.Equal(t, http.StatusOK, deleted.Code)
+
+	retry := executeRequest(t, app, http.MethodPost, "/orders", customer, body)
+	require.Equal(t, http.StatusCreated, retry.Code)
 }
 
 func TestGetOrders_WithSorting(t *testing.T) {
@@ -383,7 +552,7 @@ func TestGetOrder_ById(t *testing.T) {
 
 	app, db, trustedKey := setupTestApp(t, nil)
 	order := seedOrders(t, db, []domain.Order{
-		{CarID: 5, CarName: "test car", UserName: "customer name", UserID: ownerID, PriceCents: 100},
+		{CarID: 5, CarName: "test car", UserName: "customer name", UserID: ownerID, PriceCents: 100, Status: domain.OrderStatusConfirmed},
 	})[0]
 
 	tests := []struct {
@@ -422,6 +591,7 @@ func TestGetOrder_ById(t *testing.T) {
 			require.Equal(t, order.CarName, resp.Item.CarName)
 			require.Equal(t, order.UserName, resp.Item.UserName)
 			require.Equal(t, order.PriceCents, resp.Item.PriceCents)
+			require.Equal(t, string(domain.OrderStatusConfirmed), resp.Item.Status)
 		})
 	}
 }

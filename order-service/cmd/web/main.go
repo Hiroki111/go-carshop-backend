@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/handler"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/repository"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/service"
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/serviceauth"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -62,6 +64,11 @@ func main() {
 		log.Fatal("CAR_SERVICE_URL not set")
 	}
 
+	tokens, err := newServiceTokenSource()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	db, err := newPostgresDB()
 	if err != nil {
 		log.Fatal(err)
@@ -72,7 +79,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	carClient := carclient.NewHTTPCarClient(carServiceURL)
+	carClient := carclient.NewHTTPCarClient(carServiceURL, tokens)
 
 	service := service.NewService(repo, carClient)
 	h := handler.NewHandler(service, publicKey)
@@ -116,6 +123,31 @@ func main() {
 	}
 
 	fmt.Println("Server exited properly")
+}
+
+// newServiceTokenSource builds the client that gets this service's tokens from
+// user-service (OAuth2 client credentials). The secret has no default: without
+// it the service refuses to start rather than fail on the first order.
+func newServiceTokenSource() (*serviceauth.ClientCredentials, error) {
+	userServiceURL := os.Getenv("USER_SERVICE_URL")
+	if userServiceURL == "" {
+		return nil, fmt.Errorf("USER_SERVICE_URL not set")
+	}
+	clientID := os.Getenv("OAUTH_CLIENT_ID")
+	if clientID == "" {
+		return nil, fmt.Errorf("OAUTH_CLIENT_ID not set")
+	}
+	clientSecret := os.Getenv("OAUTH_CLIENT_SECRET")
+	if clientSecret == "" {
+		return nil, fmt.Errorf("OAUTH_CLIENT_SECRET not set (it must equal ORDER_SERVICE_CLIENT_SECRET in user-service)")
+	}
+
+	return serviceauth.NewClientCredentials(serviceauth.Config{
+		TokenURL:     strings.TrimRight(userServiceURL, "/") + "/oauth/token",
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		Scopes:       []string{"cars:reserve"},
+	})
 }
 
 func newPostgresDB() (*gorm.DB, error) {
