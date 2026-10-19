@@ -7,7 +7,16 @@ definitions:
     type: object
   handler.CreateOrderResponse:
     properties:
+      id:
+        type: integer
       message:
+        type: string
+      status:
+        enum:
+        - pending
+        - confirmed
+        - failed
+        example: confirmed
         type: string
     type: object
   handler.DeleteOrderResponse:
@@ -43,12 +52,20 @@ definitions:
   handler.OrderItem:
     properties:
       car_name:
-        description: CustomerName string `json:"customer_name"`
         type: string
       id:
         type: integer
       price_cents:
         type: integer
+      status:
+        enum:
+        - pending
+        - confirmed
+        - failed
+        example: confirmed
+        type: string
+      user_name:
+        type: string
     type: object
   handler.UpdateOrderRequest:
     properties:
@@ -134,8 +151,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Places an order for a specific product. Requires Admin or Customer
-        role.
+      description: Places an order for a car and reserves the car for it in car-service.
+        201 means the order is confirmed. 409 means the car is not available. 503
+        means the order was created but car-service could not confirm the reservation
+        yet; the order stays pending.
       parameters:
       - description: Order Payload
         in: body
@@ -168,6 +187,10 @@ paths:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "503":
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
       security:

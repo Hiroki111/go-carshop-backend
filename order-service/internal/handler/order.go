@@ -3,6 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,7 +18,7 @@ import (
 
 // CreateOrder godoc
 // @Summary      Create a new order
-// @Description  Places an order for a specific product. Requires Admin or Customer role.
+// @Description  Places an order for a car and reserves the car for it in car-service. 201 means the order is confirmed. 409 means the car is not available. 503 means the order was created but car-service could not confirm the reservation yet; the order stays pending.
 // @Tags         orders
 // @Accept       json
 // @Produce      json
@@ -28,6 +30,7 @@ import (
 // @Failure      404    {object}  ErrorResponse
 // @Failure      409    {object}  ErrorResponse
 // @Failure      500    {object}  ErrorResponse
+// @Failure      503    {object}  ErrorResponse
 // @Router       /orders [post]
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userId, ok := r.Context().Value(UserIDKey).(uint)
@@ -55,8 +58,16 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	err := h.service.CreateOrder(ctx, userId, userName, req.CarID)
+	order, err := h.service.CreateOrder(ctx, userId, userName, req.CarID)
 	if err != nil {
+		var pending *service.PendingOrderError
+		if errors.As(err, &pending) {
+			log.Printf("order %d is pending: %v", pending.OrderID, pending.Err)
+			writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{
+				Error: fmt.Sprintf("order %d was created but the car could not be reserved yet; it is pending", pending.OrderID),
+			})
+			return
+		}
 		if errors.Is(err, repository.ErrItemNotFound) {
 			writeJSON(w, http.StatusNotFound, ErrorResponse{
 				Error: "car not found",
@@ -75,7 +86,11 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, CreateOrderResponse{Message: "success"})
+	writeJSON(w, http.StatusCreated, CreateOrderResponse{
+		Message: "success",
+		ID:      order.ID,
+		Status:  string(order.Status),
+	})
 }
 
 // GetOrders godoc
@@ -332,5 +347,6 @@ func toOrderItem(order domain.Order) OrderItem {
 		CarName:    order.CarName,
 		UserName:   order.UserName,
 		PriceCents: order.PriceCents,
+		Status:     string(order.Status),
 	}
 }

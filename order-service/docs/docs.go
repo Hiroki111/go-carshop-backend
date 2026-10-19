@@ -113,7 +113,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Places an order for a specific product. Requires Admin or Customer role.",
+                "description": "Places an order for a car and reserves the car for it in car-service. 201 means the order is confirmed. 409 means the car is not available. 503 means the order was created but car-service could not confirm the reservation yet; the order stays pending.",
                 "consumes": [
                     "application/json"
                 ],
@@ -168,6 +168,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/handler.ErrorResponse"
                         }
@@ -394,8 +400,20 @@ const docTemplate = `{
         "handler.CreateOrderResponse": {
             "type": "object",
             "properties": {
+                "id": {
+                    "type": "integer"
+                },
                 "message": {
                     "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "confirmed",
+                        "failed"
+                    ],
+                    "example": "confirmed"
                 }
             }
         },
@@ -450,7 +468,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "car_name": {
-                    "description": "CustomerName string ` + "`" + `json:\"customer_name\"` + "`" + `",
                     "type": "string"
                 },
                 "id": {
@@ -458,6 +475,18 @@ const docTemplate = `{
                 },
                 "price_cents": {
                     "type": "integer"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "confirmed",
+                        "failed"
+                    ],
+                    "example": "confirmed"
+                },
+                "user_name": {
+                    "type": "string"
                 }
             }
         },

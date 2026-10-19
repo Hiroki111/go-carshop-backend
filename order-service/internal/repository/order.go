@@ -71,8 +71,32 @@ func (r *Repository) GetOrderById(id uint) (domain.Order, error) {
 	return order, nil
 }
 
-func (r *Repository) CreateOrderWithTx(tx *gorm.DB, order domain.Order) error {
-	return r.withTx(tx).db.Create(&order).Error
+// CreateOrder inserts the order with a single INSERT, which is atomic on its
+// own. If the car already has a live (pending or confirmed) order, the unique
+// index rejects it and ErrItemNotAvailable is returned.
+func (r *Repository) CreateOrder(order domain.Order) (domain.Order, error) {
+	if err := r.db.Create(&order).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return domain.Order{}, ErrItemNotAvailable
+		}
+		return domain.Order{}, err
+	}
+
+	return order, nil
+}
+
+func (r *Repository) ChangeOrderStatus(id uint, from, to domain.OrderStatus) error {
+	result := r.db.Model(&domain.Order{}).
+		Where("id = ? AND status = ?", id, string(from)).
+		Update("status", string(to))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrOrderStatusConflict
+	}
+
+	return nil
 }
 
 func (r *Repository) UpdateOrder(data UpdateOrderInput) (domain.Order, error) {

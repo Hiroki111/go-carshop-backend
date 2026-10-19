@@ -20,10 +20,3 @@ func (r *Repository) Migrate() error {
 func (r *Repository) DB() *gorm.DB {
 	return r.db
 }
-
-func (r *Repository) withTx(tx *gorm.DB) *Repository {
-	if tx == nil {
-		return r
-	}
-	return &Repository{db: tx}
-}
