@@ -6,7 +6,7 @@
 - message-service, which receives a message from order-serice via a queue (I want to use Kafka, because I want to learn it). When the message is accepted, this service will send an email to the customer.
 
 ## Key learning opportunities to build in deliberately
-- Make reserving a car concurrency-safe, so two customers cannot buy it.
+- Make reserving a car concurrency-safe, so two customers cannot buy it. -> DONE
 - Use an idempotency key for order creation.
 - Use Kafka events such as order.created.
 - Implement the transactional outbox pattern eventually, so saving an order and publishing its event remain reliable even during failures.
@@ -15,6 +15,7 @@
 - Add structured logging, health endpoints, and tracing once the basic workflow works.
 - Add a centralized key-distribution endpoint: user-service exposes something like `GET /.well-known/jwks.json` serving its current public key(s) in a standard format. Instead of reading a static file once at startup, car-service, order-service, etc periodically fetch and cache that endpoint (say, refresh every few minutes, or re-fetch whenever they see a token signed with an unfamiliar kid).
 - Once Kubernets is introduced, try centralized secret-management tooling (e.g., Vault, AWS Secrets Manager) for key rotation and replace the centralized key-distribution endpoint with it. 
+- Find out how to test that reserving a car is concurrency-safe end-to-end.
 
 ## Future development plan
 - Introduce versioned DB migration and remove repo.Migrate() / GORM AutoMigrate()
