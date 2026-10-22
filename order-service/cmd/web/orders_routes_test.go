@@ -298,16 +298,17 @@ func TestCreateOrder_DeletingAPendingOrderFreesTheCar(t *testing.T) {
 		},
 	}
 	app, db, trustedKey := setupTestApp(t, carClient)
-	customer := tokenFor(t, trustedKey, 1, auth.CustomerRole)
+	owner := tokenFor(t, trustedKey, 1, auth.CustomerRole)
+	other := tokenFor(t, trustedKey, 2, auth.CustomerRole)
 	admin := tokenFor(t, trustedKey, 99, auth.AdminRole)
 	body := handler.CreateOrderRequest{CarID: carID}
 
 	reserveErr = errors.New("timeout")
-	stuck := executeRequest(t, app, http.MethodPost, "/orders", customer, body)
+	stuck := executeRequest(t, app, http.MethodPost, "/orders", owner, body)
 	require.Equal(t, http.StatusServiceUnavailable, stuck.Code)
 
 	reserveErr = nil
-	blocked := executeRequest(t, app, http.MethodPost, "/orders", customer, body)
+	blocked := executeRequest(t, app, http.MethodPost, "/orders", other, body)
 	require.Equal(t, http.StatusConflict, blocked.Code, "the pending order still holds the car")
 
 	var pending domain.Order
@@ -315,8 +316,172 @@ func TestCreateOrder_DeletingAPendingOrderFreesTheCar(t *testing.T) {
 	deleted := executeRequest(t, app, http.MethodDelete, fmt.Sprintf("/orders/%d", pending.ID), admin, nil)
 	require.Equal(t, http.StatusOK, deleted.Code)
 
-	retry := executeRequest(t, app, http.MethodPost, "/orders", customer, body)
+	retry := executeRequest(t, app, http.MethodPost, "/orders", other, body)
 	require.Equal(t, http.StatusCreated, retry.Code)
+}
+
+// Repeating a request that already succeeded returns the same order instead of
+// "car not available". car-service reports the car as reserved from then on,
+// so this also shows that the customer's own order is looked up before the
+// availability check.
+func TestCreateOrder_RetryOfAConfirmedOrderReturnsTheSameOrder(t *testing.T) {
+	const carID = uint(5)
+
+	var reserved bool
+	var reserveCalls []reserveCall
+	carClient := &carclienttest.FakeCarClient{
+		GetCarByIDFunc: func(ctx context.Context, id uint) (carclient.Car, error) {
+			status := carclient.StatusAvailable
+			if reserved {
+				status = carclient.StatusReserved
+			}
+			return carclient.Car{ID: id, Name: "Test Car", PriceCents: 100, Status: status}, nil
+		},
+		ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+			reserved = true
+			reserveCalls = append(reserveCalls, reserveCall{carID: id, orderID: orderID})
+			return carclient.Car{ID: id, Status: carclient.StatusReserved}, nil
+		},
+	}
+	app, db, trustedKey := setupTestApp(t, carClient)
+	customerToken := tokenFor(t, trustedKey, 1, auth.CustomerRole)
+	body := handler.CreateOrderRequest{CarID: carID}
+
+	first := executeRequest(t, app, http.MethodPost, "/orders", customerToken, body)
+	require.Equal(t, http.StatusCreated, first.Code)
+	created := decodeBody[handler.CreateOrderResponse](t, first)
+	require.Equal(t, string(domain.OrderStatusConfirmed), created.Status)
+
+	retry := executeRequest(t, app, http.MethodPost, "/orders", customerToken, body)
+	require.Equal(t, http.StatusOK, retry.Code, "an existing order is returned with 200, not 201")
+	returned := decodeBody[handler.CreateOrderResponse](t, retry)
+	require.Equal(t, created.ID, returned.ID)
+	require.Equal(t, string(domain.OrderStatusConfirmed), returned.Status)
+
+	var orders []domain.Order
+	require.NoError(t, db.Find(&orders).Error)
+	require.Len(t, orders, 1)
+	require.Len(t, reserveCalls, 1, "a confirmed order is not reserved again")
+}
+
+// A request that ended as "unknown" leaves a pending order. Repeating it asks
+// car-service again, for the same order, and finishes the job.
+func TestCreateOrder_RetryOfAPendingOrderCompletesIt(t *testing.T) {
+	const carID = uint(5)
+
+	var reserveErr error
+	var reserveCalls []reserveCall
+	carClient := &carclienttest.FakeCarClient{
+		ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+			reserveCalls = append(reserveCalls, reserveCall{carID: id, orderID: orderID})
+			return carclient.Car{ID: id, Status: carclient.StatusReserved}, reserveErr
+		},
+	}
+	app, db, trustedKey := setupTestApp(t, carClient)
+	customerToken := tokenFor(t, trustedKey, 1, auth.CustomerRole)
+	body := handler.CreateOrderRequest{CarID: carID}
+
+	reserveErr = errors.New("timeout")
+	first := executeRequest(t, app, http.MethodPost, "/orders", customerToken, body)
+	require.Equal(t, http.StatusServiceUnavailable, first.Code)
+	stillDown := executeRequest(t, app, http.MethodPost, "/orders", customerToken, body)
+	require.Equal(t, http.StatusServiceUnavailable, stillDown.Code)
+
+	var orders []domain.Order
+	require.NoError(t, db.Find(&orders).Error)
+	require.Len(t, orders, 1, "retrying does not create more orders")
+	require.Equal(t, domain.OrderStatusPending, orders[0].Status)
+	orderID := orders[0].ID
+
+	reserveErr = nil
+	recovered := executeRequest(t, app, http.MethodPost, "/orders", customerToken, body)
+	require.Equal(t, http.StatusOK, recovered.Code)
+	resp := decodeBody[handler.CreateOrderResponse](t, recovered)
+	require.Equal(t, orderID, resp.ID)
+	require.Equal(t, string(domain.OrderStatusConfirmed), resp.Status)
+
+	require.NoError(t, db.Find(&orders).Error)
+	require.Len(t, orders, 1)
+	require.Equal(t, domain.OrderStatusConfirmed, orders[0].Status)
+
+	require.Equal(t, []reserveCall{
+		{carID: carID, orderID: orderID},
+		{carID: carID, orderID: orderID},
+		{carID: carID, orderID: orderID},
+	}, reserveCalls, "every attempt reserves for the same order")
+}
+
+// A failed order doesn't hold a car, so the same customer asking again is
+// a new attempt, not a retry.
+func TestCreateOrder_SameCustomerCanOrderAgainAfterAFailedOrder(t *testing.T) {
+	const carID = uint(5)
+
+	var reserveErr error
+	carClient := &carclienttest.FakeCarClient{
+		ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+			return carclient.Car{ID: id, Status: carclient.StatusReserved}, reserveErr
+		},
+	}
+	app, db, trustedKey := setupTestApp(t, carClient)
+	customerToken := tokenFor(t, trustedKey, 1, auth.CustomerRole)
+	body := handler.CreateOrderRequest{CarID: carID}
+
+	reserveErr = carclient.ErrCarNotAvailable
+	first := executeRequest(t, app, http.MethodPost, "/orders", customerToken, body)
+	require.Equal(t, http.StatusConflict, first.Code)
+
+	reserveErr = nil
+	second := executeRequest(t, app, http.MethodPost, "/orders", customerToken, body)
+	require.Equal(t, http.StatusCreated, second.Code)
+
+	var orders []domain.Order
+	require.NoError(t, db.Order("id asc").Find(&orders).Error)
+	require.Len(t, orders, 2)
+	require.Equal(t, domain.OrderStatusFailed, orders[0].Status)
+	require.Equal(t, domain.OrderStatusConfirmed, orders[1].Status)
+}
+
+// A double-click sends two identical requests at once. If the other one inserts
+// the customer's order between this request's lookup and its own insert, this
+// request must return that order, not "car not available".
+func TestCreateOrder_LosingTheInsertRaceToTheSameCustomerReturnsTheirOrder(t *testing.T) {
+	const carID = uint(5)
+	const customerID = uint(1)
+
+	var db *gorm.DB
+	var reserveCalls []reserveCall
+	carClient := &carclienttest.FakeCarClient{
+		GetCarByIDFunc: func(ctx context.Context, id uint) (carclient.Car, error) {
+			// The twin request gets in here.
+			require.NoError(t, db.Create(&domain.Order{
+				CarID:      id,
+				CarName:    "Test Car",
+				UserID:     customerID,
+				UserName:   defaultTestUserName,
+				PriceCents: 100,
+				Status:     domain.OrderStatusPending,
+			}).Error)
+			return carclient.Car{ID: id, Name: "Test Car", PriceCents: 100, Status: carclient.StatusAvailable}, nil
+		},
+		ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+			reserveCalls = append(reserveCalls, reserveCall{carID: id, orderID: orderID})
+			return carclient.Car{ID: id, Status: carclient.StatusReserved}, nil
+		},
+	}
+	app, testDB, trustedKey := setupTestApp(t, carClient)
+	db = testDB
+
+	rec := executeRequest(t, app, http.MethodPost, "/orders", tokenFor(t, trustedKey, customerID, auth.CustomerRole), handler.CreateOrderRequest{CarID: carID})
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var orders []domain.Order
+	require.NoError(t, db.Find(&orders).Error)
+	require.Len(t, orders, 1)
+	require.Equal(t, domain.OrderStatusConfirmed, orders[0].Status)
+
+	resp := decodeBody[handler.CreateOrderResponse](t, rec)
+	require.Equal(t, orders[0].ID, resp.ID)
+	require.Equal(t, []reserveCall{{carID: carID, orderID: orders[0].ID}}, reserveCalls)
 }
 
 func TestGetOrders_WithSorting(t *testing.T) {

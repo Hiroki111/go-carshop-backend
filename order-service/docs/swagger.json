@@ -107,7 +107,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Places an order for a car and reserves the car for it in car-service. 201 means the order is confirmed. 409 means the car is not available. 503 means the order was created but car-service could not confirm the reservation yet; the order stays pending.",
+                "description": "Places an order for a car and reserves the car for it in car-service. 201 means a new order was created and confirmed. 200 means the customer already had a live order for this car, so this request was a retry: the existing order is returned, and completed first if it was still pending. 409 means the car is not available. 503 means the order exists but car-service could not confirm the reservation yet; it stays pending, and repeating the request completes it.",
                 "consumes": [
                     "application/json"
                 ],
@@ -130,6 +130,12 @@
                     }
                 ],
                 "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateOrderResponse"
+                        }
+                    },
                     "201": {
                         "description": "Created",
                         "schema": {

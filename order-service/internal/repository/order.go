@@ -85,6 +85,23 @@ func (r *Repository) CreateOrder(order domain.Order) (domain.Order, error) {
 	return order, nil
 }
 
+func (r *Repository) GetLiveOrderForUser(carID, userID uint) (domain.Order, error) {
+	liveStatuses := []string{string(domain.OrderStatusPending), string(domain.OrderStatusConfirmed)}
+
+	var order domain.Order
+	err := r.db.
+		Where("car_id = ? AND user_id = ? AND status IN ?", carID, userID, liveStatuses).
+		First(&order).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Order{}, ErrItemNotFound
+		}
+		return domain.Order{}, err
+	}
+
+	return order, nil
+}
+
 func (r *Repository) ChangeOrderStatus(id uint, from, to domain.OrderStatus) error {
 	result := r.db.Model(&domain.Order{}).
 		Where("id = ? AND status = ?", id, string(from)).

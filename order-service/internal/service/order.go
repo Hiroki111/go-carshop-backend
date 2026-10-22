@@ -28,17 +28,26 @@ func (e *PendingOrderError) Error() string {
 	return fmt.Sprintf("order %d is pending: %v", e.OrderID, e.Err)
 }
 
-func (s *Service) CreateOrder(ctx context.Context, userId uint, userName string, carId uint) (domain.Order, error) {
+func (s *Service) CreateOrder(ctx context.Context, userId uint, userName string, carId uint) (domain.Order, bool, error) {
+	existing, err := s.repo.GetLiveOrderForUser(carId, userId)
+	if err == nil {
+		order, err := s.settleOrder(ctx, existing)
+		return order, false, err
+	}
+	if !errors.Is(err, repository.ErrItemNotFound) {
+		return domain.Order{}, false, err
+	}
+
 	car, err := s.carClient.GetCarByID(ctx, carId)
 	if err != nil {
 		if errors.Is(err, carclient.ErrCarNotFound) {
-			return domain.Order{}, repository.ErrItemNotFound
+			return domain.Order{}, false, repository.ErrItemNotFound
 		}
-		return domain.Order{}, err
+		return domain.Order{}, false, err
 	}
 
 	if car.Status != carclient.StatusAvailable {
-		return domain.Order{}, repository.ErrItemNotAvailable
+		return domain.Order{}, false, repository.ErrItemNotAvailable
 	}
 
 	order, err := s.repo.CreateOrder(domain.Order{
@@ -49,11 +58,38 @@ func (s *Service) CreateOrder(ctx context.Context, userId uint, userName string,
 		PriceCents: car.PriceCents,
 		Status:     domain.OrderStatusPending,
 	})
+	if errors.Is(err, repository.ErrItemNotAvailable) {
+		existing, lookupErr := s.repo.GetLiveOrderForUser(carId, userId)
+		// Another customer ordered the same car after this customer retrieved the car from car-service.
+		if errors.Is(lookupErr, repository.ErrItemNotFound) {
+			return domain.Order{}, false, repository.ErrItemNotAvailable
+		}
+		if lookupErr != nil {
+			return domain.Order{}, false, lookupErr
+		}
+		// The car has a live order. If it is this customer's own - a
+		// double-click whose twin got there first - this request is a retry of it.
+		order, err := s.settleOrder(ctx, existing)
+		return order, false, err
+	}
 	if err != nil {
-		return domain.Order{}, err
+		return domain.Order{}, false, err
 	}
 
-	_, reserveErr := s.carClient.ReserveCar(ctx, carId, order.ID)
+	order, err = s.settleOrder(ctx, order)
+	if err != nil {
+		return domain.Order{}, false, err
+	}
+
+	return order, true, nil
+}
+
+func (s *Service) settleOrder(ctx context.Context, order domain.Order) (domain.Order, error) {
+	if order.Status == domain.OrderStatusConfirmed {
+		return order, nil
+	}
+
+	_, reserveErr := s.carClient.ReserveCar(ctx, order.CarID, order.ID)
 	switch {
 	case reserveErr == nil:
 		// reserved: confirm below
@@ -67,7 +103,14 @@ func (s *Service) CreateOrder(ctx context.Context, userId uint, userName string,
 		return domain.Order{}, &PendingOrderError{OrderID: order.ID, Err: reserveErr}
 	}
 
-	if err := s.repo.ChangeOrderStatus(order.ID, domain.OrderStatusPending, domain.OrderStatusConfirmed); err != nil {
+	err := s.repo.ChangeOrderStatus(order.ID, domain.OrderStatusPending, domain.OrderStatusConfirmed)
+	if errors.Is(err, repository.ErrOrderStatusConflict) {
+		current, getErr := s.repo.GetOrderById(order.ID)
+		if getErr == nil && current.Status == domain.OrderStatusConfirmed {
+			return current, nil
+		}
+	}
+	if err != nil {
 		return domain.Order{}, &PendingOrderError{OrderID: order.ID, Err: err}
 	}
 	order.Status = domain.OrderStatusConfirmed

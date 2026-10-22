@@ -18,13 +18,14 @@ import (
 
 // CreateOrder godoc
 // @Summary      Create a new order
-// @Description  Places an order for a car and reserves the car for it in car-service. 201 means the order is confirmed. 409 means the car is not available. 503 means the order was created but car-service could not confirm the reservation yet; the order stays pending.
+// @Description  Places an order for a car and reserves the car for it in car-service. 201 means a new order was created and confirmed. 200 means the customer already had a live order for this car, so this request was a retry: the existing order is returned, and completed first if it was still pending. 409 means the car is not available. 503 means the order exists but car-service could not confirm the reservation yet; it stays pending, and repeating the request completes it.
 // @Tags         orders
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Param        order  body      CreateOrderRequest  true  "Order Payload"
 // @Success      201    {object}  CreateOrderResponse
+// @Success      200    {object}  CreateOrderResponse
 // @Failure      400    {object}  ErrorResponse
 // @Failure      401    {object}  ErrorResponse
 // @Failure      404    {object}  ErrorResponse
@@ -58,7 +59,7 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	order, err := h.service.CreateOrder(ctx, userId, userName, req.CarID)
+	order, created, err := h.service.CreateOrder(ctx, userId, userName, req.CarID)
 	if err != nil {
 		var pending *service.PendingOrderError
 		if errors.As(err, &pending) {
@@ -86,7 +87,11 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, CreateOrderResponse{
+	status := http.StatusCreated
+	if !created {
+		status = http.StatusOK
+	}
+	writeJSON(w, status, CreateOrderResponse{
 		Message: "success",
 		ID:      order.ID,
 		Status:  string(order.Status),
