@@ -115,6 +115,19 @@ TEST_POSTGRES_DSN="postgres://car_service_user:password@localhost:5432/car_servi
 
 Each such test creates its own throwaway schema and drops it when it finishes, so the data the app uses is never touched. In CI, run a Postgres container next to the job (for example a `services:` block in GitHub Actions) and set the same variable.
 
+### Testing concurrent orders
+
+Replace `$TOKEN` with an actual token and `$CAR_ID` with a car ID.
+
+```
+for i in $(seq 1 10); do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8081/orders \
+    -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+    -d '{"car_id": $CAR_ID}' &
+done; wait
+```
+
+
 ## Note:
 
 ### How to develop and run the app
