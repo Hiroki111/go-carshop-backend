@@ -28,6 +28,7 @@ func routes(handler *handler.Handler) http.Handler {
 
 		// internal: called by other services with a service token (scope), not by users
 		r.Post("/internal/cars/{id}/reservations", handler.RequireScope(auth.ScopeCarsReserve, handler.ReserveCar))
+		r.Post("/internal/cars/{id}/release", handler.RequireScope(auth.ScopeCarsRelease, handler.ReleaseCar))
 	})
 
 	// public

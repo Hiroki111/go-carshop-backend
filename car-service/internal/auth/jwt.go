@@ -17,6 +17,7 @@ const (
 
 const (
 	ScopeCarsReserve = "cars:reserve"
+	ScopeCarsRelease = "cars:release"
 )
 
 type Claims struct {

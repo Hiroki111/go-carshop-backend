@@ -482,6 +482,64 @@ func (h *Handler) ReserveCar(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// @Router       /internal/cars/{id}/release [post]
+func (h *Handler) ReleaseCar(w http.ResponseWriter, r *http.Request) {
+	idString := r.PathValue("id")
+
+	id64, err := strconv.ParseInt(idString, 10, 64)
+	if err != nil || id64 <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error: "invalid ID",
+		})
+		return
+	}
+	id := uint(id64)
+
+	var payload ReleaseCarRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error: "invalid request body",
+		})
+		return
+	}
+
+	if err := h.validate.Struct(payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error: h.formatValidationError(err),
+		})
+		return
+	}
+
+	car, err := h.service.ReleaseCar(r.Context(), id, payload.OrderID)
+	if err != nil {
+		if errors.Is(err, repository.ErrItemNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{
+				Error: "item not found",
+			})
+			return
+		}
+		if errors.Is(err, repository.ErrItemNotAvailable) {
+			writeJSON(w, http.StatusConflict, ErrorResponse{
+				Error: err.Error(),
+			})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{
+			Error: "internal error",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, ReleaseCarResponse{
+		Item: CarItem{
+			ID:         car.ID,
+			Name:       car.Name,
+			PriceCents: car.PriceCents,
+			Status:     string(car.Status),
+		},
+	})
+}
+
 func (h *Handler) DeleteCar(w http.ResponseWriter, r *http.Request) {
 	idString := r.PathValue("id")
 

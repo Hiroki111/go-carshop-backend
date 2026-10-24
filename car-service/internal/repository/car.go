@@ -8,7 +8,6 @@ import (
 
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/domain"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type GetCarsInput struct {
@@ -157,25 +156,6 @@ func (r *Repository) DeleteCar(id uint) error {
 	return nil
 }
 
-// NOTE: Currently unused
-func (r *Repository) GetCarForUpdate(tx *gorm.DB, id uint) (domain.Car, error) {
-	var car domain.Car
-
-	err := r.withTx(tx).db.Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).First(&car, "id = ?", id).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domain.Car{}, ErrItemNotFound
-		}
-		return domain.Car{}, err
-	}
-
-	if car.Status != domain.CarStatusAvailable {
-		return domain.Car{}, ErrItemNotAvailable
-	}
-
-	return car, nil
-}
-
 // ChangeCarStatus moves a car to a new status. allowed decides which
 // from -> to moves the caller is permitted to make (e.g.
 // domain.CarStatus.CanBeChangedByDealerTo); a move it rejects fails with
@@ -235,6 +215,35 @@ func (r *Repository) ReserveCar(id, orderID uint) (domain.Car, error) {
 	}
 
 	if car.Status == domain.CarStatusReserved && car.ReservedByOrderID != nil && *car.ReservedByOrderID == orderID {
+		return car, nil
+	}
+
+	return domain.Car{}, fmt.Errorf("%w: car is %s", ErrItemNotAvailable, car.Status)
+}
+
+func (r *Repository) ReleaseCar(id, orderID uint) (domain.Car, error) {
+	result := r.db.
+		Model(&domain.Car{}).
+		Where("id = ? AND status = ? AND reserved_by_order_id = ?", id, string(domain.CarStatusReserved), orderID).
+		Updates(map[string]interface{}{
+			"status":               string(domain.CarStatusAvailable),
+			"reserved_by_order_id": nil,
+			"version":              gorm.Expr("version + 1"),
+		})
+	if err := result.Error; err != nil {
+		return domain.Car{}, err
+	}
+
+	car, err := r.GetCarById(id)
+	if err != nil {
+		return domain.Car{}, err
+	}
+
+	if result.RowsAffected == 1 {
+		return car, nil
+	}
+
+	if car.Status == domain.CarStatusAvailable && car.ReservedByOrderID == nil {
 		return car, nil
 	}
 

@@ -55,7 +55,15 @@ type ReserveCarRequest struct {
 	OrderID uint `json:"order_id" validate:"required,gt=0" example:"42"`
 }
 
+type ReleaseCarRequest struct {
+	OrderID uint `json:"order_id" validate:"required,gt=0" example:"42"`
+}
+
 type ReserveCarResponse struct {
+	Item CarItem `json:"item"`
+}
+
+type ReleaseCarResponse struct {
 	Item CarItem `json:"item"`
 }
 

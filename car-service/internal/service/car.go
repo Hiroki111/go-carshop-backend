@@ -161,6 +161,23 @@ func (s *Service) ReserveCar(ctx context.Context, id, orderID uint) (domain.Car,
 	return car, nil
 }
 
+func (s *Service) ReleaseCar(ctx context.Context, id, orderID uint) (domain.Car, error) {
+	car, err := s.repo.ReleaseCar(id, orderID)
+	if err != nil {
+		return domain.Car{}, err
+	}
+
+	if err := s.carsCache.InvalidateCars(ctx); err != nil {
+		log.Printf("cache invalidation failed: %v", err)
+	}
+	if err := s.carsCache.SetCar(ctx, cache.CarCacheKey(car.ID), &car, individualCarTTL); err != nil {
+		log.Printf("cache update failed: %v", err)
+	}
+	go s.carsCacheWarmer.WarmCarList(carListTTLWithoutQuery)
+
+	return car, nil
+}
+
 func (s *Service) DeleteCar(ctx context.Context, id uint) error {
 	err := s.repo.DeleteCar(id)
 	if err != nil {
