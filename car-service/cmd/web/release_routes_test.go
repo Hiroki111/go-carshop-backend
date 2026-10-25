@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/car-service/internal/domain"
@@ -32,7 +33,7 @@ func TestReleaseCar(t *testing.T) {
 		expectedVersion uint
 	}{
 		{
-			testName: "available car is released", from: domain.CarStatusReserved, heldBy: uintPtr(orderID),
+			testName: "reserved car is released", from: domain.CarStatusReserved, heldBy: uintPtr(orderID),
 			body: map[string]any{"order_id": orderID}, expectedCode: http.StatusOK,
 			expectedStatus: domain.CarStatusAvailable, expectedHeldBy: nil, expectedVersion: 2,
 		},
@@ -47,14 +48,14 @@ func TestReleaseCar(t *testing.T) {
 			expectedStatus: domain.CarStatusReserved, expectedHeldBy: uintPtr(7), expectedVersion: 1,
 		},
 		{
-			testName: "fail - sold", from: domain.CarStatusSold, heldBy: uintPtr(7),
-			body: map[string]any{"order_id": orderID}, expectedCode: http.StatusConflict,
-			expectedStatus: domain.CarStatusSold, expectedHeldBy: uintPtr(7), expectedVersion: 1,
-		},
-		{
-			testName: "fail - release request for another order that is sold", from: domain.CarStatusSold, heldBy: uintPtr(orderID),
+			testName: "fail - sold by the same order", from: domain.CarStatusSold, heldBy: uintPtr(orderID),
 			body: map[string]any{"order_id": orderID}, expectedCode: http.StatusConflict,
 			expectedStatus: domain.CarStatusSold, expectedHeldBy: uintPtr(orderID), expectedVersion: 1,
+		},
+		{
+			testName: "fail - sold by a different order", from: domain.CarStatusSold, heldBy: uintPtr(7),
+			body: map[string]any{"order_id": orderID}, expectedCode: http.StatusConflict,
+			expectedStatus: domain.CarStatusSold, expectedHeldBy: uintPtr(7), expectedVersion: 1,
 		},
 		{
 			testName: "fail - withdrawn", from: domain.CarStatusWithdrawn,
@@ -136,13 +137,68 @@ func TestReleaseCar(t *testing.T) {
 			}
 
 			if test.expectedCode == http.StatusOK {
-				var resp handler.ReserveCarResponse
+				var resp handler.ReleaseCarResponse
 				if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
 				}
 				if resp.Item.ID != car.ID || resp.Item.Status != string(domain.CarStatusAvailable) {
 					t.Fatalf("unexpected response item: %+v", resp.Item)
 				}
+			}
+		})
+	}
+}
+
+func TestReleaseCar_Authorization(t *testing.T) {
+	otherPrivateKey := newTestKey(t)
+
+	tests := []struct {
+		testName     string
+		token        string
+		expectedCode int
+	}{
+		{testName: "no token", token: "", expectedCode: http.StatusUnauthorized},
+		{testName: "garbage token", token: "not-a-jwt", expectedCode: http.StatusUnauthorized},
+		{
+			testName:     "service token signed by an untrusted key",
+			token:        signServiceToken(t, otherPrivateKey, "order-service", auth.ScopeCarsRelease, time.Now().Add(time.Hour)),
+			expectedCode: http.StatusUnauthorized,
+		},
+		{testName: "customer token", token: tokenFor(t, auth.CustomerRole), expectedCode: http.StatusForbidden},
+		{testName: "admin token", token: tokenFor(t, auth.AdminRole), expectedCode: http.StatusForbidden},
+		{testName: "service token without scopes", token: serviceTokenFor(t, ""), expectedCode: http.StatusForbidden},
+		{testName: "service token with another scope", token: serviceTokenFor(t, "cars:reserve"), expectedCode: http.StatusForbidden},
+		{testName: "service token with a look-alike scope", token: serviceTokenFor(t, "cars:reserved"), expectedCode: http.StatusForbidden},
+		{testName: "service token with the scope", token: serviceTokenFor(t, auth.ScopeCarsRelease), expectedCode: http.StatusOK},
+		{testName: "service token with several scopes", token: serviceTokenFor(t, "cars:release cars:reserve"), expectedCode: http.StatusOK},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			app, db := setupTestApp(t)
+
+			car := domain.Car{Name: "test", PriceCents: 5, Status: domain.CarStatusReserved, ReservedByOrderID: uintPtr(1)}
+			if err := db.Create(&car).Error; err != nil {
+				t.Fatal(err)
+			}
+
+			rec := executeRequest(t, app, http.MethodPost, releasePath(car.ID), test.token, map[string]any{"order_id": 1})
+
+			if rec.Code != test.expectedCode {
+				t.Fatalf("expected code %d, got %d (body: %s)", test.expectedCode, rec.Code, rec.Body.String())
+			}
+
+			// A rejected caller must not change anything.
+			var stored domain.Car
+			if err := db.First(&stored, car.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			wantStatus := domain.CarStatusReserved
+			if test.expectedCode == http.StatusOK {
+				wantStatus = domain.CarStatusAvailable
+			}
+			if stored.Status != wantStatus {
+				t.Fatalf("expected status %q in DB, got %q", wantStatus, stored.Status)
 			}
 		})
 	}
