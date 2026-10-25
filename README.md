@@ -7,8 +7,9 @@
 
 ## Key learning opportunities to build in deliberately
 - Make reserving a car concurrency-safe, so two customers cannot buy it. -> DONE
-- Make `POST /orders` safe to retry. A unique index already allows only one live (pending or confirmed) order per car. A retry by the same customer returns their original order, and completes it if it was still pending, instead of failing with 409. A car is one of a kind, so the car ID acts as the idempotency key. An explicit `Idempotency-Key` header would be needed if a customer could legitimately order the same thing twice.
- - Allow car-service to release a car upon order cancellation.
+- Make `POST /orders` safe to retry. A unique index already allows only one live (pending or confirmed) order per car. A retry by the same customer returns their original order, and completes it if it was still pending, instead of failing with 409. A car is one of a kind, so the car ID acts as the idempotency key. An explicit `Idempotency-Key` header would be needed if a customer could legitimately order the same thing twice. -> DONE
+- Allow car-service to release a car upon order cancellation.
+- Refactor test cases that are duplicated.
 - Use Kafka events such as order.created.
 - Implement the transactional outbox pattern eventually, so saving an order and publishing its event remain reliable even during failures.
 - Make message-service idempotent, since Kafka consumers may receive messages more than once.

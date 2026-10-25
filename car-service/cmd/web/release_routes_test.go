@@ -164,6 +164,11 @@ func TestReleaseCar_Authorization(t *testing.T) {
 			token:        signServiceToken(t, otherPrivateKey, "order-service", auth.ScopeCarsRelease, time.Now().Add(time.Hour)),
 			expectedCode: http.StatusUnauthorized,
 		},
+		{
+			testName:     "service token expired",
+			token:        signServiceToken(t, trustedKey, "order-service", auth.ScopeCarsRelease, time.Now().Add(-time.Hour)),
+			expectedCode: http.StatusUnauthorized,
+		},
 		{testName: "customer token", token: tokenFor(t, auth.CustomerRole), expectedCode: http.StatusForbidden},
 		{testName: "admin token", token: tokenFor(t, auth.AdminRole), expectedCode: http.StatusForbidden},
 		{testName: "service token without scopes", token: serviceTokenFor(t, ""), expectedCode: http.StatusForbidden},

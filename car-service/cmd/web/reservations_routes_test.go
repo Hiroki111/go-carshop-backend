@@ -173,6 +173,11 @@ func TestReserveCar_Authorization(t *testing.T) {
 			token:        signServiceToken(t, otherKey, "order-service", auth.ScopeCarsReserve, time.Now().Add(time.Hour)),
 			expectedCode: http.StatusUnauthorized,
 		},
+		{
+			testName:     "service token expired",
+			token:        signServiceToken(t, trustedKey, "order-service", auth.ScopeCarsReserve, time.Now().Add(-time.Hour)),
+			expectedCode: http.StatusUnauthorized,
+		},
 		// Whoever the caller is, a user can't reserve a car through the internal
 		// endpoint: a customer's order has to go through order-service.
 		{testName: "customer token", token: tokenFor(t, auth.CustomerRole), expectedCode: http.StatusForbidden},
