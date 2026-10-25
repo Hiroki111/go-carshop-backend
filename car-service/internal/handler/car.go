@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -461,8 +462,9 @@ func (h *Handler) ReserveCar(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, repository.ErrItemNotAvailable) {
+			log.Printf("reserving car %d for order %d: %v", id, payload.OrderID, err)
 			writeJSON(w, http.StatusConflict, ErrorResponse{
-				Error: err.Error(),
+				Error: "item not available",
 			})
 			return
 		}
@@ -519,8 +521,9 @@ func (h *Handler) ReleaseCar(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, repository.ErrItemNotAvailable) {
+			log.Printf("releasing car %d from order %d: %v", id, payload.OrderID, err)
 			writeJSON(w, http.StatusConflict, ErrorResponse{
-				Error: err.Error(),
+				Error: "item not available",
 			})
 			return
 		}
