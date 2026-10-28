@@ -302,6 +302,60 @@ func (h *Handler) UpdateOrder(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, UpdateOrderResponse{Item: toOrderItem(order)})
 }
 
+// CancelOrder godoc
+// @Summary      Cancel an order
+// @Description  Cancels a pending or confirmed order and releases its car in car-service (Admin only). Repeating the request for an order that is already cancelled returns 200 with the order. 409 means the order is failed (nothing to cancel), car-service refused to release the car, or the order changed while the request was running. 503 means car-service could not confirm the release: the order is unchanged and the request can be repeated.
+// @Tags         orders
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Order ID"
+// @Success      200  {object}  CancelOrderResponse
+// @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      403  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Failure      503  {object}  ErrorResponse
+// @Router       /orders/{id}/cancel [post]
+func (h *Handler) CancelOrder(w http.ResponseWriter, r *http.Request) {
+	idString := r.PathValue("id")
+
+	id64, err := strconv.ParseInt(idString, 10, 64)
+	if err != nil || id64 <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error: "invalid ID",
+		})
+		return
+	}
+	id := uint(id64)
+
+	order, err := h.service.CancelOrder(r.Context(), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrItemNotFound):
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "order not found"})
+		case errors.Is(err, service.ErrOrderNotCancellable):
+			writeJSON(w, http.StatusConflict, ErrorResponse{Error: "order cannot be cancelled (order may be failed previsouly or never held a car)"})
+		case errors.Is(err, service.ErrCarNotReleasable):
+			log.Printf("order %d: %v", id, err)
+			writeJSON(w, http.StatusConflict, ErrorResponse{Error: "car could not be released (car may be sold or held by a different order)"})
+		case errors.Is(err, repository.ErrOrderStatusConflict):
+			writeJSON(w, http.StatusConflict, ErrorResponse{Error: "order changed while it was being cancelled; try again"})
+		case errors.Is(err, service.ErrCarReleaseUnconfirmed):
+			log.Printf("order %d: %v", id, err)
+			writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "car-service could not confirm the release; the order is unchanged, try again"})
+		default:
+			log.Printf("order %d: failed to cancel: %v", id, err)
+			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "internal error"})
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, CancelOrderResponse{Item: toOrderItem(order)})
+}
+
 // DeleteOrder godoc
 // @Summary      Delete an order
 // @Description  Deletes an order by ID (Admin only).

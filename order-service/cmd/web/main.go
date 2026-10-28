@@ -146,7 +146,7 @@ func newServiceTokenSource() (*serviceauth.ClientCredentials, error) {
 		TokenURL:     strings.TrimRight(userServiceURL, "/") + "/oauth/token",
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		Scopes:       []string{"cars:reserve"},
+		Scopes:       []string{"cars:reserve", "cars:release"},
 	})
 }
 

@@ -19,7 +19,7 @@ type OrderItem struct {
 	CarName    string `json:"car_name"`
 	UserName   string `json:"user_name"`
 	PriceCents uint   `json:"price_cents"`
-	Status     string `json:"status" enums:"pending,confirmed,failed" example:"confirmed"`
+	Status     string `json:"status" enums:"pending,confirmed,failed,cancelled" example:"confirmed"`
 }
 
 type GetOrdersResponse struct {
@@ -31,6 +31,10 @@ type GetOrdersResponse struct {
 }
 
 type GetOrderResponse struct {
+	Item OrderItem `json:"item"`
+}
+
+type CancelOrderResponse struct {
 	Item OrderItem `json:"item"`
 }
 

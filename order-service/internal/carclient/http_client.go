@@ -36,7 +36,7 @@ type getCarResponse struct {
 	Item carItem `json:"item"`
 }
 
-type reserveCarRequest struct {
+type orderCommandRequest struct {
 	OrderID uint `json:"order_id"`
 }
 
@@ -66,27 +66,9 @@ func (c *HTTPCarClient) GetCarByID(ctx context.Context, id uint) (Car, error) {
 }
 
 func (c *HTTPCarClient) ReserveCar(ctx context.Context, carID, orderID uint) (Car, error) {
-	token, err := c.tokens.Token(ctx)
+	resp, err := c.postForOrder(ctx, fmt.Sprintf("/internal/cars/%d/reservations", carID), orderID)
 	if err != nil {
-		return Car{}, fmt.Errorf("carclient: failed to get a service token: %w", err)
-	}
-
-	payload, err := json.Marshal(reserveCarRequest{OrderID: orderID})
-	if err != nil {
-		return Car{}, fmt.Errorf("carclient: failed to encode request: %w", err)
-	}
-
-	url := fmt.Sprintf("%s/internal/cars/%d/reservations", c.baseURL, carID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return Car{}, fmt.Errorf("carclient: failed to build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return Car{}, fmt.Errorf("carclient: failed to reach car-service: %w", err)
+		return Car{}, err
 	}
 	defer resp.Body.Close()
 
@@ -100,6 +82,54 @@ func (c *HTTPCarClient) ReserveCar(ctx context.Context, carID, orderID uint) (Ca
 	default:
 		return Car{}, fmt.Errorf("carclient: reserving car %d for order %d: unexpected status code %d", carID, orderID, resp.StatusCode)
 	}
+}
+
+func (c *HTTPCarClient) ReleaseCar(ctx context.Context, carID, orderID uint) error {
+	resp, err := c.postForOrder(ctx, fmt.Sprintf("/internal/cars/%d/release", carID), orderID)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusNotFound:
+		return ErrCarNotFound
+	case http.StatusConflict:
+		return ErrCarNotAvailable
+	default:
+		return fmt.Errorf("carclient: releasing car %d for order %d: unexpected status code %d", carID, orderID, resp.StatusCode)
+	}
+}
+
+// postForOrder sends the POST that car-service's internal endpoints expect: the
+// service token as a bearer token, and the order ID in the body. The caller
+// closes the response body.
+func (c *HTTPCarClient) postForOrder(ctx context.Context, path string, orderID uint) (*http.Response, error) {
+	token, err := c.tokens.Token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("carclient: failed to get a service token: %w", err)
+	}
+
+	payload, err := json.Marshal(orderCommandRequest{OrderID: orderID})
+	if err != nil {
+		return nil, fmt.Errorf("carclient: failed to encode request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("carclient: failed to build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("carclient: failed to reach car-service: %w", err)
+	}
+
+	return resp, nil
 }
 
 func decodeCar(resp *http.Response) (Car, error) {

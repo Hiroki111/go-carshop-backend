@@ -19,6 +19,12 @@ type CarClient interface {
 	// safe. It returns ErrCarNotFound or ErrCarNotAvailable for definite
 	// answers; any other error means the outcome is unknown.
 	ReserveCar(ctx context.Context, carID, orderID uint) (Car, error)
+
+	// ReleaseCar asks car-service to put the car this order reserved back on
+	// sale. The order ID is the idempotency key: repeating the call for the
+	// same order is safe. It returns ErrCarNotFound or ErrCarNotAvailable for
+	// definite answers; any other error means the outcome is unknown.
+	ReleaseCar(ctx context.Context, carID, orderID uint) error
 }
 
 // TokenSource hands out the bearer token this service presents to

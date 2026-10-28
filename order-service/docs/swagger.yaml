@@ -1,5 +1,10 @@
 basePath: /
 definitions:
+  handler.CancelOrderResponse:
+    properties:
+      item:
+        $ref: '#/definitions/handler.OrderItem'
+    type: object
   handler.CreateOrderRequest:
     properties:
       car_id:
@@ -62,6 +67,7 @@ definitions:
         - pending
         - confirmed
         - failed
+        - cancelled
         example: confirmed
         type: string
       user_name:
@@ -337,6 +343,62 @@ paths:
       security:
       - BearerAuth: []
       summary: Update an order
+      tags:
+      - orders
+  /orders/{id}/cancel:
+    post:
+      consumes:
+      - application/json
+      description: 'Cancels a pending or confirmed order and releases its car in car-service
+        (Admin only). Repeating the request for an order that is already cancelled
+        returns 200 with the order. 409 means the order is failed (nothing to cancel),
+        car-service refused to release the car, or the order changed while the request
+        was running. 503 means car-service could not confirm the release: the order
+        is unchanged and the request can be repeated.'
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CancelOrderResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cancel an order
       tags:
       - orders
 securityDefinitions:

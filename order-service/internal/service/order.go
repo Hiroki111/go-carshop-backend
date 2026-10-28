@@ -19,6 +19,21 @@ type GetOrderParameters struct {
 	Limit   int
 }
 
+var (
+	// ErrOrderNotCancellable means the order is in a status that can't be
+	// cancelled (failed: it never held a car).
+	ErrOrderNotCancellable = errors.New("order cannot be cancelled")
+
+	// ErrCarNotReleasable means car-service refused to release the car: it is
+	// sold, or held by a different order.
+	ErrCarNotReleasable = errors.New("car-service refused to release the car")
+
+	// ErrCarReleaseUnconfirmed means car-service didn't answer definitely
+	// (timeout, outage, unexpected status). The order is left as it was, so
+	// the cancellation can be repeated.
+	ErrCarReleaseUnconfirmed = errors.New("car-service did not confirm the release")
+)
+
 type PendingOrderError struct {
 	OrderID uint
 	Err     error
@@ -123,6 +138,49 @@ func (s *Service) markOrderFailed(orderID uint) {
 	if err != nil {
 		log.Printf("order %d: failed to mark the order as failed: %v", orderID, err)
 	}
+}
+
+func (s *Service) CancelOrder(ctx context.Context, id uint) (domain.Order, error) {
+	order, err := s.repo.GetOrderById(id)
+	if err != nil {
+		return domain.Order{}, err
+	}
+
+	switch order.Status {
+	case domain.OrderStatusCancelled:
+		return order, nil
+	case domain.OrderStatusPending, domain.OrderStatusConfirmed:
+		// cancel below
+	default:
+		return domain.Order{}, ErrOrderNotCancellable
+	}
+
+	err = s.carClient.ReleaseCar(ctx, order.CarID, order.ID)
+	switch {
+	case err == nil:
+		// released
+	case errors.Is(err, carclient.ErrCarNotFound):
+		// The car no longer exists, so there is nothing left to release.
+	case errors.Is(err, carclient.ErrCarNotAvailable):
+		return domain.Order{}, ErrCarNotReleasable
+	default:
+		return domain.Order{}, fmt.Errorf("%w: %w", ErrCarReleaseUnconfirmed, err)
+	}
+
+	err = s.repo.ChangeOrderStatus(order.ID, order.Status, domain.OrderStatusCancelled)
+	if errors.Is(err, repository.ErrOrderStatusConflict) {
+		// Another admin cancelled it at the same moment: same result.
+		current, getErr := s.repo.GetOrderById(order.ID)
+		if getErr == nil && current.Status == domain.OrderStatusCancelled {
+			return current, nil
+		}
+	}
+	if err != nil {
+		return domain.Order{}, err
+	}
+	order.Status = domain.OrderStatusCancelled
+
+	return order, nil
 }
 
 func (s *Service) GetOrdersWithTotalCount(ctx context.Context, params GetOrderParameters) ([]domain.Order, uint, error) {

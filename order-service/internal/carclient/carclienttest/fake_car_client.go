@@ -20,6 +20,7 @@ import (
 type FakeCarClient struct {
 	GetCarByIDFunc func(ctx context.Context, id uint) (carclient.Car, error)
 	ReserveCarFunc func(ctx context.Context, carID, orderID uint) (carclient.Car, error)
+	ReleaseCarFunc func(ctx context.Context, carID, orderID uint) error
 }
 
 func (f *FakeCarClient) GetCarByID(ctx context.Context, id uint) (carclient.Car, error) {
@@ -36,4 +37,12 @@ func (f *FakeCarClient) ReserveCar(ctx context.Context, carID, orderID uint) (ca
 	}
 
 	return carclient.Car{ID: carID, Name: "Test Car", PriceCents: 100, Status: carclient.StatusReserved}, nil
+}
+
+func (f *FakeCarClient) ReleaseCar(ctx context.Context, carID, orderID uint) error {
+	if f.ReleaseCarFunc != nil {
+		return f.ReleaseCarFunc(ctx, carID, orderID)
+	}
+
+	return nil
 }

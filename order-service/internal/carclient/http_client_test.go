@@ -115,3 +115,97 @@ func TestReserveCar_WithoutAServiceTokenNothingIsSent(t *testing.T) {
 	require.False(t, errors.Is(err, carclient.ErrCarNotAvailable))
 	require.Zero(t, requests)
 }
+
+func TestReleaseCar_SendsTheServiceTokenAndTheOrderID(t *testing.T) {
+	type seenRequest struct {
+		method, path, auth, contentType string
+		body                            map[string]any
+	}
+	seen := make(chan seenRequest, 1)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		seen <- seenRequest{
+			method:      r.Method,
+			path:        r.URL.Path,
+			auth:        r.Header.Get("Authorization"),
+			contentType: r.Header.Get("Content-Type"),
+			body:        body,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"item":{"id":5,"name":"Golf","price_cents":1200,"status":"available"}}`))
+	}))
+	defer srv.Close()
+
+	client := carclient.NewHTTPCarClient(srv.URL, &fakeTokenSource{token: "service-token"})
+
+	require.NoError(t, client.ReleaseCar(context.Background(), 5, 42))
+
+	got := <-seen
+	require.Equal(t, http.MethodPost, got.method)
+	require.Equal(t, "/internal/cars/5/release", got.path)
+	require.Equal(t, "Bearer service-token", got.auth)
+	require.Equal(t, "application/json", got.contentType)
+	require.Equal(t, map[string]any{"order_id": float64(42)}, got.body)
+}
+
+func TestReleaseCar_MapsCarServiceAnswers(t *testing.T) {
+	tests := []struct {
+		name        string
+		status      int
+		expectedErr error
+		wantErr     bool
+	}{
+		{name: "ok means released", status: http.StatusOK},
+		{name: "not found is a definite answer", status: http.StatusNotFound, wantErr: true, expectedErr: carclient.ErrCarNotFound},
+		{name: "conflict is a definite answer", status: http.StatusConflict, wantErr: true, expectedErr: carclient.ErrCarNotAvailable},
+		{name: "unauthorized is not a statement about the car", status: http.StatusUnauthorized, wantErr: true},
+		{name: "forbidden is not a statement about the car", status: http.StatusForbidden, wantErr: true},
+		{name: "bad request is not a statement about the car", status: http.StatusBadRequest, wantErr: true},
+		{name: "server error is not a statement about the car", status: http.StatusInternalServerError, wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(test.status)
+			}))
+			defer srv.Close()
+
+			client := carclient.NewHTTPCarClient(srv.URL, &fakeTokenSource{token: "t"})
+			err := client.ReleaseCar(context.Background(), 5, 42)
+
+			if !test.wantErr {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			if test.expectedErr != nil {
+				require.ErrorIs(t, err, test.expectedErr)
+				return
+			}
+			require.False(t, errors.Is(err, carclient.ErrCarNotFound), "must not be mistaken for a definite answer")
+			require.False(t, errors.Is(err, carclient.ErrCarNotAvailable), "must not be mistaken for a definite answer")
+		})
+	}
+}
+
+func TestReleaseCar_WithoutAServiceTokenNothingIsSent(t *testing.T) {
+	requests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+	}))
+	defer srv.Close()
+
+	tokenErr := errors.New("user-service is down")
+	client := carclient.NewHTTPCarClient(srv.URL, &fakeTokenSource{err: tokenErr})
+
+	err := client.ReleaseCar(context.Background(), 5, 42)
+
+	require.ErrorIs(t, err, tokenErr)
+	require.False(t, errors.Is(err, carclient.ErrCarNotFound))
+	require.False(t, errors.Is(err, carclient.ErrCarNotAvailable))
+	require.Zero(t, requests)
+}
