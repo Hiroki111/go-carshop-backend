@@ -337,7 +337,7 @@ func (h *Handler) CancelOrder(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, repository.ErrItemNotFound):
 			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "order not found"})
 		case errors.Is(err, service.ErrOrderNotCancellable):
-			writeJSON(w, http.StatusConflict, ErrorResponse{Error: "order cannot be cancelled (order may be failed previsouly or never held a car)"})
+			writeJSON(w, http.StatusConflict, ErrorResponse{Error: "order cannot be cancelled (it failed, so it never held a car)"})
 		case errors.Is(err, service.ErrCarNotReleasable):
 			log.Printf("order %d: %v", id, err)
 			writeJSON(w, http.StatusConflict, ErrorResponse{Error: "car could not be released (car may be sold or held by a different order)"})

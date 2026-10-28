@@ -233,6 +233,54 @@ func TestCreateOrder_ReservedButNotConfirmedStaysPending(t *testing.T) {
 	require.Contains(t, decodeBody[handler.ErrorResponse](t, rec).Error, "pending")
 }
 
+// An admin cancels the order after the customer's request has started but
+// before it has reserved the car. The cancellation's release found nothing to
+// release, so the reservation made afterwards would hold the car for an order
+// that no longer exists, unless the request gives it back.
+func TestCreateOrder_CancelledWhileReservingGivesTheCarBack(t *testing.T) {
+	const carID = uint(5)
+
+	tests := []struct {
+		testName   string
+		releaseErr error
+	}{
+		{testName: "car-service releases the car"},
+		{testName: "car-service can't release the car", releaseErr: errors.New("timeout")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			var db *gorm.DB
+			var releaseCalls []releaseCall
+			carClient := &carclienttest.FakeCarClient{
+				ReserveCarFunc: func(ctx context.Context, id, orderID uint) (carclient.Car, error) {
+					// An admin cancels the order after the customer's request has started
+					require.NoError(t, db.Model(&domain.Order{}).Where("id = ?", orderID).Update("status", string(domain.OrderStatusCancelled)).Error)
+					// And then the customer reserves the car
+					return carclient.Car{ID: id, Status: carclient.StatusReserved}, nil
+				},
+				ReleaseCarFunc: func(ctx context.Context, id, orderID uint) error {
+					// Since the order has been cancelled, ReleaseCarFunc has to be called by the customer
+					releaseCalls = append(releaseCalls, releaseCall{carID: id, orderID: orderID})
+					return test.releaseErr
+				},
+			}
+			app, testDB, trustedKey := setupTestApp(t, carClient)
+			db = testDB
+
+			token := tokenFor(t, trustedKey, 1, auth.CustomerRole)
+			rec := executeRequest(t, app, http.MethodPost, "/orders", token, handler.CreateOrderRequest{CarID: carID})
+
+			require.Equal(t, http.StatusConflict, rec.Code)
+
+			var order domain.Order
+			require.NoError(t, db.Where("car_id = ?", carID).First(&order).Error)
+			require.Equal(t, domain.OrderStatusCancelled, order.Status, "the order must stay cancelled")
+			require.Equal(t, []releaseCall{{carID: carID, orderID: order.ID}}, releaseCalls)
+		})
+	}
+}
+
 // One car, one live order: the second customer is turned away by the order
 // database itself, before car-service is asked anything.
 func TestCreateOrder_SecondLiveOrderForTheSameCarIsRejected(t *testing.T) {
@@ -905,6 +953,7 @@ func TestOrderRoutes_Authorization(t *testing.T) {
 		{http.MethodGet, "/orders"},
 		{http.MethodPatch, "/orders/1"},
 		{http.MethodDelete, "/orders/1"},
+		{http.MethodPost, "/orders/1/cancel"},
 	}
 	anyRole := []route{
 		{http.MethodPost, "/orders"},

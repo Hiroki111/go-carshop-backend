@@ -121,8 +121,17 @@ func (s *Service) settleOrder(ctx context.Context, order domain.Order) (domain.O
 	err := s.repo.ChangeOrderStatus(order.ID, domain.OrderStatusPending, domain.OrderStatusConfirmed)
 	if errors.Is(err, repository.ErrOrderStatusConflict) {
 		current, getErr := s.repo.GetOrderById(order.ID)
-		if getErr == nil && current.Status == domain.OrderStatusConfirmed {
-			return current, nil
+		if getErr == nil {
+			switch current.Status {
+			case domain.OrderStatusConfirmed:
+				return current, nil
+			case domain.OrderStatusCancelled:
+				// An admin cancelled the order while the car was being
+				// reserved, after the cancellation's own release had already
+				// run. Nothing else will free the car now.
+				s.releaseCarOfCancelledOrder(ctx, order)
+				return domain.Order{}, repository.ErrItemNotAvailable
+			}
 		}
 	}
 	if err != nil {
@@ -131,6 +140,13 @@ func (s *Service) settleOrder(ctx context.Context, order domain.Order) (domain.O
 	order.Status = domain.OrderStatusConfirmed
 
 	return order, nil
+}
+
+func (s *Service) releaseCarOfCancelledOrder(ctx context.Context, order domain.Order) {
+	err := s.carClient.ReleaseCar(ctx, order.CarID, order.ID)
+	if err != nil && !errors.Is(err, carclient.ErrCarNotFound) {
+		log.Printf("order %d: cancelled while car %d was being reserved, and releasing the car failed: %v", order.ID, order.CarID, err)
+	}
 }
 
 func (s *Service) markOrderFailed(orderID uint) {
