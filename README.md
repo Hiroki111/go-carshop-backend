@@ -8,8 +8,7 @@
 ## Key learning opportunities to build in deliberately
 - Make reserving a car concurrency-safe, so two customers cannot buy it. -> DONE
 - Make `POST /orders` safe to retry. A unique index already allows only one live (pending or confirmed) order per car. A retry by the same customer returns their original order, and completes it if it was still pending, instead of failing with 409. A car is one of a kind, so the car ID acts as the idempotency key. An explicit `Idempotency-Key` header would be needed if a customer could legitimately order the same thing twice. -> DONE
-- Allow car-service to release a car upon order cancellation.
-- Refactor test cases that are duplicated.
+- Allow car-service to release a car upon order cancellation. -> DONE
 - Use Kafka events such as order.created.
 - Implement the transactional outbox pattern eventually, so saving an order and publishing its event remain reliable even during failures.
 - Make message-service idempotent, since Kafka consumers may receive messages more than once.
@@ -18,6 +17,7 @@
 - Add a centralized key-distribution endpoint: user-service exposes something like `GET /.well-known/jwks.json` serving its current public key(s) in a standard format. Instead of reading a static file once at startup, car-service, order-service, etc periodically fetch and cache that endpoint (say, refresh every few minutes, or re-fetch whenever they see a token signed with an unfamiliar kid).
 - Once Kubernets is introduced, try centralized secret-management tooling (e.g., Vault, AWS Secrets Manager) for key rotation and replace the centralized key-distribution endpoint with it. 
 - Find out how to test that reserving a car is concurrency-safe end-to-end.
+- Refactor test cases that are duplicated.
 
 ## Future development plan
 - Introduce versioned DB migration and remove repo.Migrate() / GORM AutoMigrate()
