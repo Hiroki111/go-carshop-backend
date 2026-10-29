@@ -156,6 +156,15 @@ func (s *Service) markOrderFailed(orderID uint) {
 	}
 }
 
+// CancelOrder cancels a pending or confirmed order and gives its car back to
+// car-service. The car is released first and the order is marked cancelled
+// afterwards: until car-service confirms the release, the order keeps holding
+// the car, so the unique index can't let another customer order a car that
+// car-service still has reserved. If the release fails, nothing has changed and
+// the request can simply be repeated. Cancelling an already cancelled order
+// succeeds without calling car-service, because the car was released before the
+// order was marked. The one case where that doesn't hold is a cancellation that
+// races with the customer's own retry; settleOrder gives the car back then.
 func (s *Service) CancelOrder(ctx context.Context, id uint) (domain.Order, error) {
 	order, err := s.repo.GetOrderById(id)
 	if err != nil {
