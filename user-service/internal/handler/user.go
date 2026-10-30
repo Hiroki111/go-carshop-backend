@@ -42,6 +42,7 @@ func (h *Handler) RegisterCustomer(w http.ResponseWriter, r *http.Request) {
 	err := h.service.CreateUser(domain.User{
 		UserName: data.UserName,
 		Password: data.Password,
+		Email:    data.Email,
 		Role:     domain.CustomerRole,
 	})
 	if err != nil {

@@ -54,9 +54,10 @@ func main() {
 	}
 
 	adminUserName := os.Getenv("ADMIN_USERNAME")
+	adminEmail := os.Getenv("ADMIN_EMAIL")
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
-	if adminUserName == "" || adminPassword == "" {
-		log.Fatal("ADMIN_USERNAME and ADMIN_PASSWORD must both be set")
+	if adminUserName == "" || adminEmail == "" || adminPassword == "" {
+		log.Fatal("ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_PASSWORD must be set")
 	}
 
 	clients, err := newOAuthClientRegistry()
@@ -78,7 +79,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := repo.EnsureAdminExists(adminUserName, string(hashedAdminPassword)); err != nil {
+	if err := repo.EnsureAdminExists(adminUserName, service.NormalizeEmail(adminEmail), string(hashedAdminPassword)); err != nil {
 		log.Fatal(err)
 	}
 

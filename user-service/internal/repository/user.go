@@ -10,6 +10,7 @@ import (
 func (r *Repository) CreateUser(data domain.User, hashedPassword string) error {
 	result := r.db.Create(&domain.User{
 		UserName: data.UserName,
+		Email:    data.Email,
 		Password: hashedPassword,
 		Role:     data.Role,
 	})

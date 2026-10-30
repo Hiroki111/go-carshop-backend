@@ -6,6 +6,7 @@ type ErrorResponse struct {
 
 type RegisterUserRequest struct {
 	UserName string `json:"user_name" validate:"required"`
+	Email    string `json:"email" validate:"required,email,max=254"`
 	Password string `json:"password" validate:"required,min=8"`
 }
 

@@ -252,10 +252,15 @@ const docTemplate = `{
         "handler.RegisterUserRequest": {
             "type": "object",
             "required": [
+                "email",
                 "password",
                 "user_name"
             ],
             "properties": {
+                "email": {
+                    "type": "string",
+                    "maxLength": 254
+                },
                 "password": {
                     "type": "string",
                     "minLength": 8

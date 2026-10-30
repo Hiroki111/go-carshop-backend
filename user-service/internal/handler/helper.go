@@ -22,6 +22,8 @@ func (h *Handler) formatValidationError(err error) string {
 			switch validationError.Tag() {
 			case "required":
 				errorMessages = append(errorMessages, fmt.Sprintf("field '%s' is required", validationError.Field()))
+			case "email":
+				errorMessages = append(errorMessages, fmt.Sprintf("field '%s' must be a valid email address", validationError.Field()))
 			case "min":
 				errorMessages = append(errorMessages, fmt.Sprintf("field '%s' must be at least %s characters long", validationError.Field(), validationError.Param()))
 			case "max":

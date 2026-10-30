@@ -32,12 +32,16 @@ definitions:
     type: object
   handler.RegisterUserRequest:
     properties:
+      email:
+        maxLength: 254
+        type: string
       password:
         minLength: 8
         type: string
       user_name:
         type: string
     required:
+    - email
     - password
     - user_name
     type: object

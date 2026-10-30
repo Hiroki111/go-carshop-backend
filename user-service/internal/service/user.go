@@ -15,6 +15,8 @@ func (s *Service) CreateUser(input domain.User) error {
 		return err
 	}
 
+	input.Email = NormalizeEmail(input.Email)
+
 	return s.repo.CreateUser(input, string(hashedPassword))
 }
 

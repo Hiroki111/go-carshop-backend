@@ -18,13 +18,14 @@ func (r *Repository) Migrate() error {
 }
 
 // EnsureAdminExists creates a default admin account if none exists yet with
-// this username, so the very first admin can log in without a public
+// these username and email, so the very first admin can log in without a public
 // "create an admin" endpoint (which would let anyone grant themselves
-// admin). userName/hashedPassword are expected to come from startup
+// admin). userName/Email/hashedPassword are expected to come from startup
 // configuration (environment variables) rather than being hardcoded.
-func (r *Repository) EnsureAdminExists(userName string, hashedPassword string) error {
+func (r *Repository) EnsureAdminExists(userName string, email string, hashedPassword string) error {
 	admin := domain.User{
 		UserName: userName,
+		Email:    email,
 		Password: hashedPassword,
 		Role:     domain.AdminRole,
 	}
