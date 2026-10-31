@@ -17,11 +17,13 @@ func (r *Repository) Migrate() error {
 	return r.db.AutoMigrate(&domain.User{})
 }
 
-// EnsureAdminExists creates a default admin account if none exists yet with
-// these username and email, so the very first admin can log in without a public
-// "create an admin" endpoint (which would let anyone grant themselves
-// admin). userName/Email/hashedPassword are expected to come from startup
-// configuration (environment variables) rather than being hardcoded.
+// EnsureAdminExists creates an admin account unless a user with this user name
+// already exists, in which case it changes nothing: a different email or
+// password in the configuration is ignored. This lets the very first admin log
+// in without a public "create an admin" endpoint (which would let anyone grant
+// themselves admin). The values are expected to come from startup configuration
+// (environment variables) rather than being hardcoded. The email must already
+// be normalized; Service.EnsureAdminExists shoud do that.
 func (r *Repository) EnsureAdminExists(userName string, email string, hashedPassword string) error {
 	admin := domain.User{
 		UserName: userName,

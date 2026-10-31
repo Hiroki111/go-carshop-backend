@@ -16,7 +16,6 @@ import (
 	"github.com/Hiroki111/go-carshop-backend/user-service/internal/repository"
 	"github.com/Hiroki111/go-carshop-backend/user-service/internal/service"
 	"github.com/joho/godotenv"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -75,15 +74,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	hashedAdminPassword, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := repo.EnsureAdminExists(adminUserName, service.NormalizeEmail(adminEmail), string(hashedAdminPassword)); err != nil {
-		log.Fatal(err)
-	}
-
 	svc := service.NewService(repo, privateKey, clients)
+	if err := svc.EnsureAdminExists(adminUserName, adminEmail, adminPassword); err != nil {
+		log.Fatal(err)
+	}
 	h := handler.NewHandler(svc)
 
 	server := &http.Server{

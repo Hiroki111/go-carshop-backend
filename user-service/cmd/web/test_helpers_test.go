@@ -33,6 +33,14 @@ func mustGenerateKey() *rsa.PrivateKey {
 func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
 	t.Helper()
 
+	svc, db := newTestService(t)
+
+	return routes(handler.NewHandler(svc)), db
+}
+
+func newTestService(t *testing.T) (*service.Service, *gorm.DB) {
+	t.Helper()
+
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		// Without this, a unique-index violation isn't reported as
 		// gorm.ErrDuplicatedKey, which the repository relies on.
@@ -52,9 +60,7 @@ func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
 	clients, err := oauth.NewRegistry()
 	require.NoError(t, err)
 
-	svc := service.NewService(repo, testKey, clients)
-
-	return routes(handler.NewHandler(svc)), db
+	return service.NewService(repo, testKey, clients), db
 }
 
 func executeRequest(t *testing.T, app http.Handler, method, path string, body any) *httptest.ResponseRecorder {
