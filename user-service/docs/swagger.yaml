@@ -5,6 +5,20 @@ definitions:
       error:
         type: string
     type: object
+  handler.GetInternalUserResponse:
+    properties:
+      item:
+        $ref: '#/definitions/handler.InternalUserItem'
+    type: object
+  handler.InternalUserItem:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      user_name:
+        type: string
+    type: object
   handler.LoginUserRequest:
     properties:
       password:
@@ -80,6 +94,49 @@ info:
   title: Go User Service API
   version: "1.0"
 paths:
+  /internal/users/{id}:
+    get:
+      description: 'Returns the ID, user name and email of a user. For other services
+        only: the caller needs a service token with the users:read scope (see POST
+        /oauth/token). The role and the password hash are never returned.'
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetInternalUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Look a user up (service to service)
+      tags:
+      - internal
   /login-user:
     post:
       consumes:

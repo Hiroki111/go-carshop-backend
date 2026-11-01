@@ -53,3 +53,7 @@ func (s *Service) Login(userName string, password string) (string, error) {
 
 	return auth.GenerateJWTToken(s.privateKey, user.ID, user.UserName, user.Role)
 }
+
+func (s *Service) GetUserByID(id uint) (domain.User, error) {
+	return s.repo.GetUserByID(id)
+}

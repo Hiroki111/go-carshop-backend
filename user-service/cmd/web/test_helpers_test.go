@@ -35,7 +35,11 @@ func setupTestApp(t *testing.T) (http.Handler, *gorm.DB) {
 
 	svc, db := newTestService(t)
 
-	return routes(handler.NewHandler(svc)), db
+	return newTestApp(svc), db
+}
+
+func newTestApp(svc *service.Service) http.Handler {
+	return routes(handler.NewHandler(svc, &testKey.PublicKey))
 }
 
 func newTestService(t *testing.T) (*service.Service, *gorm.DB) {
@@ -66,6 +70,12 @@ func newTestService(t *testing.T) (*service.Service, *gorm.DB) {
 func executeRequest(t *testing.T, app http.Handler, method, path string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 
+	return executeRequestWithToken(t, app, method, path, "", body)
+}
+
+func executeRequestWithToken(t *testing.T, app http.Handler, method, path, token string, body any) *httptest.ResponseRecorder {
+	t.Helper()
+
 	var buf bytes.Buffer
 	switch b := body.(type) {
 	case nil:
@@ -77,6 +87,9 @@ func executeRequest(t *testing.T, app http.Handler, method, path string, body an
 
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	rec := httptest.NewRecorder()
 	app.ServeHTTP(rec, req)

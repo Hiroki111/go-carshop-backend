@@ -12,12 +12,12 @@ import (
 	"strings"
 )
 
-// Scopes a service token can carry. car-service checks them, so the names are
-// part of the contract between the two services.
 const (
 	ScopeCarsReserve = "cars:reserve"
 	ScopeCarsRelease = "cars:release"
 	ScopeCarsSold    = "cars:sold"
+
+	ScopeUsersRead = "users:read"
 )
 
 // MinSecretLength is the shortest client secret we accept. Generate one with

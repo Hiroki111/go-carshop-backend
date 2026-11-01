@@ -59,7 +59,7 @@ func newTokenHandler(t *testing.T) *Handler {
 		t.Fatal(err)
 	}
 
-	return NewHandler(service.NewService(nil, testKey, registry))
+	return NewHandler(service.NewService(nil, testKey, registry), &testKey.PublicKey)
 }
 
 // requestMod changes a token request before it is sent.

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/Hiroki111/go-carshop-backend/user-service/internal/handler"
+	"github.com/Hiroki111/go-carshop-backend/user-service/internal/oauth"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
@@ -20,6 +21,8 @@ func routes(handler *handler.Handler) http.Handler {
 		r.Post("/register-customer", handler.RegisterCustomer)
 		r.Post("/login-user", handler.LoginUser)
 		r.Post("/oauth/token", handler.IssueToken)
+
+		r.Get("/internal/users/{id}", handler.RequireScope(oauth.ScopeUsersRead, handler.GetInternalUser))
 	})
 
 	// infra / public routes

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/hex"
+	"errors"
 	"strings"
 	"time"
 
@@ -39,7 +40,6 @@ func GenerateJWTToken(privateKey *rsa.PrivateKey, userID uint, userName string, 
 }
 
 type ServiceClaims struct {
-	// Scope is the space-separated list of granted scopes (RFC 6749 section 3.3).
 	Scope string `json:"scope"`
 	jwt.RegisteredClaims
 }
@@ -64,4 +64,47 @@ func GenerateServiceToken(privateKey *rsa.PrivateKey, clientID string, scopes []
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	return token.SignedString(privateKey)
+}
+
+type ServiceIdentity struct {
+	// Subject is the client ID, e.g. "message-service".
+	Subject string
+	Scope   string
+}
+
+func ParseServiceToken(publicKey *rsa.PublicKey, tokenString string) (ServiceIdentity, error) {
+	if publicKey == nil {
+		return ServiceIdentity{}, errors.New("public key not configured")
+	}
+
+	token, err := jwt.ParseWithClaims(
+		tokenString, &ServiceClaims{},
+		func(token *jwt.Token) (interface{}, error) {
+			return publicKey, nil
+		},
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil {
+		return ServiceIdentity{}, err
+	}
+
+	claims, ok := token.Claims.(*ServiceClaims)
+	if !ok || !token.Valid {
+		return ServiceIdentity{}, errors.New("invalid token")
+	}
+
+	return ServiceIdentity{Subject: claims.Subject, Scope: claims.Scope}, nil
+}
+
+func HasScope(scope, required string) bool {
+	if required == "" {
+		return false
+	}
+	for _, s := range strings.Fields(scope) {
+		if s == required {
+			return true
+		}
+	}
+	return false
 }

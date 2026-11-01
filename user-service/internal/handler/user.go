@@ -3,7 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/Hiroki111/go-carshop-backend/user-service/internal/domain"
 	"github.com/Hiroki111/go-carshop-backend/user-service/internal/repository"
@@ -111,5 +113,53 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, LoginUserResponse{
 		AccessToken: token,
 		TokenType:   "Bearer",
+	})
+}
+
+// GetInternalUser godoc
+// @Summary      Look a user up (service to service)
+// @Description  Returns the ID, user name and email of a user. For other services only: the caller needs a service token with the users:read scope (see POST /oauth/token). The role and the password hash are never returned.
+// @Tags         internal
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "User ID"
+// @Success      200  {object}  GetInternalUserResponse
+// @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      403  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Router       /internal/users/{id} [get]
+func (h *Handler) GetInternalUser(w http.ResponseWriter, r *http.Request) {
+	id64, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id64 <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error: "invalid ID",
+		})
+		return
+	}
+
+	user, err := h.service.GetUserByID(uint(id64))
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{
+				Error: "user not found",
+			})
+			return
+		}
+
+		log.Printf("user %d: failed to look the user up: %v", id64, err)
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{
+			Error: "internal error",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, GetInternalUserResponse{
+		Item: InternalUserItem{
+			ID:       user.ID,
+			UserName: user.UserName,
+			Email:    user.Email,
+		},
 	})
 }

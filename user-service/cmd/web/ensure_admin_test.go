@@ -24,7 +24,7 @@ func login(t *testing.T, app http.Handler, userName, password string) int {
 
 func TestEnsureAdminExists_CreatesAnAdminWhoCanLogIn(t *testing.T) {
 	svc, db := newTestService(t)
-	app := routes(handler.NewHandler(svc))
+	app := newTestApp(svc)
 
 	require.NoError(t, svc.EnsureAdminExists("admin", "admin@example.com", testAdminPassword))
 
@@ -36,7 +36,7 @@ func TestEnsureAdminExists_CreatesAnAdminWhoCanLogIn(t *testing.T) {
 
 func TestEnsureAdminExists_EmailIsStoredLowerCased(t *testing.T) {
 	svc, db := newTestService(t)
-	app := routes(handler.NewHandler(svc))
+	app := newTestApp(svc)
 
 	require.NoError(t, svc.EnsureAdminExists("admin", "Admin@Example.COM", testAdminPassword))
 
@@ -79,7 +79,7 @@ func TestEnsureAdminExists_RejectsAnInvalidEmail(t *testing.T) {
 
 func TestEnsureAdminExists_ChangesNothingWhenTheUserNameExists(t *testing.T) {
 	svc, db := newTestService(t)
-	app := routes(handler.NewHandler(svc))
+	app := newTestApp(svc)
 
 	require.NoError(t, svc.EnsureAdminExists("admin", "admin@example.com", testAdminPassword))
 	require.NoError(t, svc.EnsureAdminExists("admin", "other@example.com", "another-password-456"))

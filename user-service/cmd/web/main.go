@@ -78,7 +78,7 @@ func main() {
 	if err := svc.EnsureAdminExists(adminUserName, adminEmail, adminPassword); err != nil {
 		log.Fatal(err)
 	}
-	h := handler.NewHandler(svc)
+	h := handler.NewHandler(svc, &privateKey.PublicKey)
 
 	server := &http.Server{
 		Addr:    portNumber,
@@ -131,7 +131,16 @@ func newOAuthClientRegistry() (*oauth.Registry, error) {
 		return nil, fmt.Errorf("ORDER_SERVICE_CLIENT_SECRET: %w", err)
 	}
 
-	return oauth.NewRegistry(orderService)
+	messageService, err := oauth.NewClient(
+		"message-service",
+		os.Getenv("MESSAGE_SERVICE_CLIENT_SECRET"),
+		[]string{oauth.ScopeUsersRead},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("MESSAGE_SERVICE_CLIENT_SECRET: %w", err)
+	}
+
+	return oauth.NewRegistry(orderService, messageService)
 }
 
 func newPostgresDB() (*gorm.DB, error) {

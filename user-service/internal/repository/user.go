@@ -34,3 +34,16 @@ func (r *Repository) GetUserByUserName(userName string) (domain.User, error) {
 
 	return user, nil
 }
+
+func (r *Repository) GetUserByID(id uint) (domain.User, error) {
+	var user domain.User
+
+	if err := r.db.First(&user, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.User{}, ErrUserNotFound
+		}
+		return domain.User{}, err
+	}
+
+	return user, nil
+}

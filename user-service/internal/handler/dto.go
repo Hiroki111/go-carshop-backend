@@ -14,6 +14,16 @@ type RegisterUserResponse struct {
 	Status string `json:"status"`
 }
 
+type InternalUserItem struct {
+	ID       uint   `json:"id"`
+	UserName string `json:"user_name"`
+	Email    string `json:"email"`
+}
+
+type GetInternalUserResponse struct {
+	Item InternalUserItem `json:"item"`
+}
+
 type LoginUserRequest struct {
 	UserName string `json:"user_name" validate:"required"`
 	Password string `json:"password" validate:"required"`
