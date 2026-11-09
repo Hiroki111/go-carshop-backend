@@ -118,7 +118,12 @@ func (s *Service) settleOrder(ctx context.Context, order domain.Order) (domain.O
 		return domain.Order{}, &PendingOrderError{OrderID: order.ID, Err: reserveErr}
 	}
 
-	err := s.repo.ChangeOrderStatus(order.ID, domain.OrderStatusPending, domain.OrderStatusConfirmed)
+	event, err := s.newOutboxEvent(domain.EventTypeOrderConfirmed, order)
+	if err != nil {
+		return domain.Order{}, err
+	}
+
+	err = s.repo.ChangeOrderStatusAndRecordEvent(ctx, order.ID, domain.OrderStatusPending, domain.OrderStatusConfirmed, event)
 	if errors.Is(err, repository.ErrOrderStatusConflict) {
 		current, getErr := s.repo.GetOrderById(order.ID)
 		if getErr == nil {
@@ -192,7 +197,12 @@ func (s *Service) CancelOrder(ctx context.Context, id uint) (domain.Order, error
 		return domain.Order{}, fmt.Errorf("%w: %w", ErrCarReleaseUnconfirmed, err)
 	}
 
-	err = s.repo.ChangeOrderStatus(order.ID, order.Status, domain.OrderStatusCancelled)
+	event, err := s.newOutboxEvent(domain.EventTypeOrderCancelled, order)
+	if err != nil {
+		return domain.Order{}, err
+	}
+
+	err = s.repo.ChangeOrderStatusAndRecordEvent(ctx, order.ID, order.Status, domain.OrderStatusCancelled, event)
 	if errors.Is(err, repository.ErrOrderStatusConflict) {
 		// Another admin cancelled it at the same moment: same result.
 		current, getErr := s.repo.GetOrderById(order.ID)

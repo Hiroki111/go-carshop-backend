@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/domain"
@@ -100,6 +101,19 @@ func (r *Repository) GetLiveOrderForUser(carID, userID uint) (domain.Order, erro
 	}
 
 	return order, nil
+}
+
+func (r *Repository) ChangeOrderStatusAndRecordEvent(
+	ctx context.Context, orderId uint, from, to domain.OrderStatus, event domain.OutboxEvent,
+) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := r.withTx(tx).ChangeOrderStatus(orderId, from, to)
+		if err != nil {
+			return err
+		}
+		err = r.withTx(tx).CreateOutboxEvent(event)
+		return err
+	})
 }
 
 func (r *Repository) ChangeOrderStatus(id uint, from, to domain.OrderStatus) error {

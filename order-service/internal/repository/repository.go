@@ -14,9 +14,16 @@ func NewRepository(db *gorm.DB) *Repository {
 }
 
 func (r *Repository) Migrate() error {
-	return r.db.AutoMigrate(&domain.Order{})
+	return r.db.AutoMigrate(&domain.Order{}, &domain.OutboxEvent{})
 }
 
 func (r *Repository) DB() *gorm.DB {
 	return r.db
+}
+
+func (r *Repository) withTx(tx *gorm.DB) *Repository {
+	if tx == nil {
+		return r
+	}
+	return &Repository{db: tx}
 }
