@@ -111,8 +111,7 @@ func (r *Repository) ChangeOrderStatusAndRecordEvent(
 		if err != nil {
 			return err
 		}
-		err = r.withTx(tx).CreateOutboxEvent(event)
-		return err
+		return r.withTx(tx).CreateOutboxEvent(event)
 	})
 }
 

@@ -9,11 +9,13 @@ import (
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/domain"
 )
 
+const orderEventVersion = 1
+
 func (s *Service) newOutboxEvent(eventType domain.EventType, order domain.Order) (domain.OutboxEvent, error) {
 	payload := domain.OrderEventPayload{
 		EventID:    uuid.New().String(),
 		EventType:  eventType,
-		Version:    1,
+		Version:    orderEventVersion,
 		OccurredAt: time.Now().UTC(),
 		OrderID:    order.ID,
 		UserID:     order.UserID,
