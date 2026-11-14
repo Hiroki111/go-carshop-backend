@@ -14,6 +14,8 @@ import (
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/auth"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/carclient"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/handler"
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/kafkapublisher"
+	"github.com/Hiroki111/go-carshop-backend/order-service/internal/outbox"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/repository"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/service"
 	"github.com/Hiroki111/go-carshop-backend/order-service/internal/serviceauth"
@@ -24,6 +26,7 @@ import (
 
 const (
 	portNumber                 = ":8081"
+	ordersTopic                = "orders"
 	initialProductListCacheTTL = 30 * time.Minute
 )
 
@@ -84,6 +87,22 @@ func main() {
 	service := service.NewService(repo, carClient)
 	h := handler.NewHandler(service, publicKey)
 
+	publisher, err := newKafkaPublisher()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// The relay sends the events that orders record in the outbox table to
+	// Kafka. It runs next to the server and is stopped before the publisher
+	// and the database are closed.
+	relay := outbox.NewRelay(repo, publisher, outbox.Config{})
+	relayCtx, stopRelay := context.WithCancel(context.Background())
+	relayDone := make(chan struct{})
+	go func() {
+		defer close(relayDone)
+		_ = relay.Run(relayCtx)
+	}()
+
 	server := &http.Server{
 		Addr:    portNumber,
 		Handler: routes(h),
@@ -115,7 +134,17 @@ func main() {
 		log.Printf("server forced to shutdown: %v", err)
 	}
 
-	// 3. Now that no more handlers are running, close infra
+	// 3. Stop the relay (it uses the publisher and the database), then the
+	// publisher
+	stopRelay()
+	select {
+	case <-relayDone:
+	case <-ctx.Done():
+		log.Printf("outbox relay did not stop in time")
+	}
+	publisher.Close()
+
+	// 4. Now that no more handlers are running, close infra
 	fmt.Println("Closing database and cache connections...")
 
 	if sqlDB, err := db.DB(); err == nil && sqlDB != nil {
@@ -148,6 +177,23 @@ func newServiceTokenSource() (*serviceauth.ClientCredentials, error) {
 		ClientSecret: clientSecret,
 		Scopes:       []string{"cars:reserve", "cars:release"},
 	})
+}
+
+// newKafkaPublisher builds the publisher for the orders topic. KAFKA_BROKERS
+// has no default: without it the service refuses to start instead of silently
+// never announcing any order.
+func newKafkaPublisher() (*kafkapublisher.Publisher, error) {
+	var brokers []string
+	for _, broker := range strings.Split(os.Getenv("KAFKA_BROKERS"), ",") {
+		if broker = strings.TrimSpace(broker); broker != "" {
+			brokers = append(brokers, broker)
+		}
+	}
+	if len(brokers) == 0 {
+		return nil, fmt.Errorf("KAFKA_BROKERS not set (comma-separated, e.g. localhost:29092)")
+	}
+
+	return kafkapublisher.New(brokers, ordersTopic)
 }
 
 func newPostgresDB() (*gorm.DB, error) {
