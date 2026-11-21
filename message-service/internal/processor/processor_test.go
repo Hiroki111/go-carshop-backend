@@ -119,10 +119,11 @@ func TestProcess_PermanentFailure(t *testing.T) {
 	}
 
 	tests := []struct {
-		testName string
-		value    []byte
+		testName         string
+		value            []byte
+		expectUserLookup bool
 	}{
-		{testName: "the user doesn't exist", value: withChange(func(e *orderEvent) { e.UserID = 99 })},
+		{testName: "the user doesn't exist", value: withChange(func(e *orderEvent) { e.UserID = 99 }), expectUserLookup: true},
 		{testName: "not valid JSON", value: []byte(`{"event_id": `)},
 		{testName: "not JSON at all", value: []byte(`hello`)},
 		{testName: "unknown event type", value: withChange(func(e *orderEvent) { e.EventType = "order.shipped" })},
@@ -140,6 +141,11 @@ func TestProcess_PermanentFailure(t *testing.T) {
 			require.ErrorIs(t, err, processor.ErrPermanent)
 			require.Empty(t, f.mailer.sent)
 			require.Empty(t, processedEventIDs(t, f.db))
+			if test.expectUserLookup {
+				require.Len(t, f.users.calls, 1)
+			} else {
+				require.Empty(t, f.users.calls, "an invalid event must be rejected before user-service is asked")
+			}
 		})
 	}
 }
