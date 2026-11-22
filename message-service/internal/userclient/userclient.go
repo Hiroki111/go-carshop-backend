@@ -10,3 +10,7 @@ type User struct {
 type UserClient interface {
 	GetUser(ctx context.Context, id uint) (User, error)
 }
+
+type TokenSource interface {
+	Token(ctx context.Context) (string, error)
+}
